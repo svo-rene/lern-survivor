@@ -11,6 +11,7 @@ Ein kleines Survivor-Spiel für den Informatikunterricht: Gegnerwellen überlebe
 | 🐍 Python-Grundlagen | Variablen, Datentypen, Kontrollstrukturen, Funktionen, Parameter, lokal/global, Listen |
 | 📊 Algorithmen & Sortieren | Sortierverfahren, Suche, O-Notation, Laufzeitanalyse |
 | 🧱 Datenstrukturen | Feld, einfach verkettete Liste, Stapel, Schlange, Baum |
+| 🤖 KI · 🔦 Technische Informatik · 🔧 OOP · 📡 Netze · ⚙️ Automaten · 🗄️ Datenmanagement · 🔐 Sicherheit | Auswahlfragen aus den LK-Fragensammlungen von „Automate the Castle“ (Ordner `lk/`, umgewandelt in `lk.js`) |
 
 ## Eigene Fragen
 
