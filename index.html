@@ -894,7 +894,7 @@ function start(){
   G.tips=$('tipsChk').checked; G.tipSeen=new Set(); tipQ=[]; tipT=0; $('tip').classList.remove('on'); tip('move'); document.body.classList.add('playing'); toastT=0; resume();
 }
 // Bestenliste: nur in diesem Browser (localStorage), pro Lernbereich
-const fmtT = s => Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+const fmtT = t => { const s=Math.max(0,Math.ceil(t)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); };
 function boardHtml(area, mark){
   const L=store.get('ls_scores',[]).filter(s=>s.area===area).sort((a,b)=>b.pts-a.pts).slice(0,10);
   if(!L.length) return '<p class="hint">Noch keine Einträge – sei die oder der Erste!</p>';
