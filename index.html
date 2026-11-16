@@ -189,7 +189,8 @@ const MAPS = [
   {id:'?', icon:'🏜️', name:'Weitere Karten', desc:'kommen später', off:true},
 ];
 const RAR = [
-  {name:'Gewöhnlich', m:1}, {name:'Selten', m:1.5}, {name:'Episch', m:2.2}, {name:'Legendär', m:3.2},
+  // m = Faktor für Buch-Werte, step = Stufen für Waffen/Gegenstände
+  {name:'Gewöhnlich', m:1, step:1}, {name:'Selten', m:1.7, step:1}, {name:'Episch', m:2.8, step:2}, {name:'Legendär', m:4.5, step:3},
 ];
 // Waffen (max. 4 gleichzeitig) und Bücher (Werte)
 const WEAPONS = {
@@ -208,7 +209,7 @@ const UPS = [
   // Bücher: v = Grundwert, wird mit Seltenheit multipliziert
   {id:'schaden', icon:'📕', name:'Buch der Macht', v:.12, txt:v=>`+${pc(v)} Schaden`, ap:(p,v)=>p.dmg+=v},
   {id:'tempo', icon:'📗', name:'Buch der Eile', v:.10, txt:v=>`+${pc(v)} Angriffstempo`, ap:(p,v)=>p.rate+=v},
-  {id:'menge', icon:'📘', name:'Buch der Vielzahl', v:.5, txt:v=>`+${Math.max(1,Math.floor(v))} Geschoss${Math.floor(v)>1?'e':''}`, ap:(p,v)=>p.count+=Math.max(1,Math.floor(v))},
+  {id:'menge', icon:'📘', name:'Buch der Vielzahl', v:.67, txt:v=>`+${Math.max(1,Math.round(v))} Geschoss${Math.round(v)>1?'e':''}`, ap:(p,v)=>p.count+=Math.max(1,Math.round(v))},   // 1 / 1 / 2 / 3
   {id:'groesse', icon:'📙', name:'Buch der Größe', v:.12, txt:v=>`+${pc(v)} Größe & Reichweite`, ap:(p,v)=>p.size+=v},
   {id:'laufen', icon:'👢', name:'Buch der Schritte', v:.08, txt:v=>`+${pc(v)} Laufgeschwindigkeit`, ap:(p,v)=>p.speed*=1+v},
   {id:'leben', icon:'❤️', name:'Buch der Ausdauer', v:20, txt:v=>`+${Math.round(v)} max. Leben`, ap:(p,v)=>{p.maxHp+=v;p.hp+=v}},
@@ -258,7 +259,7 @@ function newGame(){
   const C=choice.cls; G.cls=C; p.maxHp=p.hp=C.hp; p.speed*=C.spd; R3.setLook(C.robe, C.hat);
   addWeapon(C.weapon);
 }
-const xpNeed = l => 2 + Math.floor(l*1.2 + l*l*0.05);   // schnell leveln = viele Fragen
+const xpNeed = l => 2 + Math.floor(l*0.9 + l*l*0.035);   // schnell leveln = viele Fragen
 
 // ================= Waffen =================
 function addWeapon(id){ G.p.w[id] = {lvl:1, cd:0, ang:0}; }
@@ -331,7 +332,7 @@ function updWeapons(dt){
     }
     if(id==='schild'){
       w.max=Math.min(4, 1+Math.floor(w.lvl/2.5)); w.layers=w.layers||0;
-      if(w.layers<w.max && w.cd<=0){ w.layers++; w.cd=Math.max(1.4, 4.2-w.lvl*.35)/rate; }
+      if(w.layers<w.max && w.cd<=0){ w.layers++; w.cd=Math.max(2.5, 5-w.lvl*.3); }   // bewusst ohne Angriffstempo
       if(w.layers>=w.max) w.cd=Math.max(w.cd,.5);
     }
     if(id==='aura'){
@@ -353,11 +354,15 @@ function hurt(e,d){
 // ================= Gegner =================
 function spawn(type){
   const p=G.p, a=Math.random()*Math.PI*2, d=Math.hypot(W,H)/2+60;
-  if(!type){ const r=Math.random(); type = (G.t>100&&r<.12)?'lock':(G.t>40&&r<.35)?'glitch':'bug'; }
-  const f=FOES[type], hm=1+G.t/55+(G.t/240)**2, sm=Math.min(1.9,1+G.t/360);
-  G.en.push({type, x:p.x+Math.cos(a)*d, y:p.y+Math.sin(a)*d, r:f.r, hp:f.hp*hm, max:f.hp*hm, sp:f.sp*sm, dmg:f.dmg*(1+G.t/400), xp:f.xp, col:f.col, flash:0, slow:0});
+  // mit der Zeit mehr schnelle Glitches – irgendwann holen sie jeden ein
+  if(!type){ const r=Math.random(), gl=.23+Math.min(.45,G.t/900); type = (G.t>100&&r<.12)?'lock':(G.t>40&&r<.12+gl)?'glitch':'bug'; }
+  // Schwierigkeit wächst mit der Zeit immer schneller (eine Runde soll nach einigen Minuten enden)
+  const f=FOES[type], hm=1+G.t/DIFF.hp+(G.t/DIFF.hp2)**2.2, sm=G.t<600 ? Math.min(3.5,1+G.t/DIFF.sp) : 1+G.t/DIFF.sp;   // ab ~6 Min. kaum noch weglaufen, ab 10 Min. gar nicht mehr
+  G.en.push({type, x:p.x+Math.cos(a)*d, y:p.y+Math.sin(a)*d, r:f.r, hp:f.hp*hm, max:f.hp*hm, sp:f.sp*sm, dmg:f.dmg*(1+G.t/DIFF.dmg+(G.t/DIFF.dmg2)**2), xp:f.xp, col:f.col, flash:0, slow:0});
 }
-const spawnRate = () => Math.min(28, 0.7 + G.t/32 + (G.t/170)**2);
+// Anfang sanft (linearer Teil), danach steigt es schnell (Potenz-Teil)
+const DIFF = {hp:60, hp2:95, sp:220, dmg:240, dmg2:160, spawn:30, spawn2:95};
+const spawnRate = () => Math.min(34, 0.7 + G.t/DIFF.spawn + (G.t/DIFF.spawn2)**2);
 
 // ================= Update =================
 const keys = {}; let joy = null;
@@ -373,7 +378,8 @@ function update(dt){
   let mx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0), my=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
   if(joy){ const dx=joy.x-joy.ox, dy=joy.y-joy.oy, l=Math.hypot(dx,dy); if(l>6){ mx=dx/Math.max(l,45); my=dy/Math.max(l,45); } }
   const l=Math.hypot(mx,my); if(l>1){mx/=l;my/=l;}
-  p.x+=mx*p.speed*dt; p.y+=my*p.speed*dt; if(mx) p.face=Math.sign(mx);
+  const spd=Math.min(p.speed, 270);   // Obergrenze: sonst kann man allen Gegnern ewig davonlaufen
+  p.x+=mx*spd*dt; p.y+=my*spd*dt; if(mx) p.face=Math.sign(mx);
   if(mx||my){ const ll=Math.hypot(mx,my); p.dx=mx/ll; p.dy=my/ll; }
   p.hp=Math.min(p.maxHp,p.hp+p.regen*dt); p.hurtT-=dt; p.inv=(p.inv||0)-dt;
 
@@ -410,7 +416,7 @@ function update(dt){
       if(od>0&&od<m){ const f=(m-od)/2/od; e.x+=ox*f; e.y+=oy*f; } }
     if(d < e.r+p.r){
       if(p.inv>0){}   // gerade geschützt
-      else if(p.w.schild && p.w.schild.layers>0){ p.w.schild.layers--; p.inv=.6; knock(e,p,80); G.fx.push({x:p.x,y:p.y,r:46,life:.25,max:.25,col:'#67e8f9'}); }
+      else if(p.w.schild && p.w.schild.layers>0){ p.w.schild.layers--; p.inv=.25; knock(e,p,80); G.fx.push({x:p.x,y:p.y,r:46,life:.25,max:.25,col:'#67e8f9'}); }
       else { p.hp -= e.dmg*dt*(1-Math.min(.75, p.armor+lvlBonus('armor'))); p.hurtT=.12; tip('hurt'); }
       if(p.thorns) hurt(e, p.thorns*dt); }
   }
@@ -554,16 +560,16 @@ function openPick(){
   $('pkLuck').textContent=`🍀 Glück ${L} – je mehr Glück, desto öfter selten, episch, legendär.`;
   $('pkCards').innerHTML=opts.map((o,i)=>{ const R=RAR[o.r]; let ic,nm,tx;
     if(o.kind==='heal'){ ic='❤️‍🩹'; nm='Heiltrank'; tx='Alles ist voll ausgebaut – heilt dich vollständig.'; }
-    else if(o.kind==='item'){ const l=p.items[o.it.id]||0, to=Math.min(MAX_ITEM_LVL,l+(o.r>=2?2:1)); ic=o.it.icon; nm=o.it.name+(l?` Lv ${to}/${MAX_ITEM_LVL}`:' (neu)');
+    else if(o.kind==='item'){ const l=p.items[o.it.id]||0, to=Math.min(MAX_ITEM_LVL,l+RAR[o.r].step); ic=o.it.icon; nm=o.it.name+(l?` Lv ${to}/${MAX_ITEM_LVL}`:' (neu)');
       tx=o.it.txt+(to-l>1?` (×${to-l})`:'')+(l?'':` · belegt 1 von ${SLOTS-nI} freien Plätzen`); }
     else if(o.kind==='up'){ const b=p.books[o.u.id]; ic=o.u.icon; nm=o.u.name+(b?` Lv ${b+1}/${MAX_BOOK_LVL}`:' (neu)'); tx=o.u.txt(o.u.v*R.m)+(b?'':` · belegt 1 von ${SLOTS-nB} freien Buchplätzen`); }
-    else { const W_=WEAPONS[o.id], w=p.w[o.id]; ic=W_.icon; nm=W_.name+(w?` Lv ${Math.min(MAX_WEP_LVL,w.lvl+(o.r>=2?2:1))}/${MAX_WEP_LVL}`:' (neu)'); tx=w?(o.r>=2?'+2 Stufen':'+1 Stufe')+': mehr Schaden, mehr Wirkung':W_.desc+` · belegt 1 von ${SLOTS-nW} freien Waffenplätzen`; }
+    else { const W_=WEAPONS[o.id], w=p.w[o.id]; ic=W_.icon; nm=W_.name+(w?` Lv ${Math.min(MAX_WEP_LVL,w.lvl+RAR[o.r].step)}/${MAX_WEP_LVL}`:' (neu)'); tx=w?(RAR[o.r].step>1?`+${RAR[o.r].step} Stufen`:'+1 Stufe')+': mehr Schaden, mehr Wirkung':W_.desc+` · belegt 1 von ${SLOTS-nW} freien Waffenplätzen`; }
     return `<button class="card r${o.r}" data-i="${i}"><span class="rl" style="color:var(--r${o.r})">${R.name}</span><div class="big">${ic}</div><b>${nm}</b><small>${tx}</small></button>`; }).join('');
   $('pkCards').onclick=e=>{ const b=e.target.closest('.card'); if(!b) return; const o=opts[+b.dataset.i], R=RAR[o.r];
     if(o.kind==='heal') p.hp=p.maxHp;
-    else if(o.kind==='item'){ const l=p.items[o.it.id]||0, to=Math.min(MAX_ITEM_LVL,l+(o.r>=2?2:1)); for(let k=l;k<to;k++) o.it.ap(p); p.items[o.it.id]=to; }
+    else if(o.kind==='item'){ const l=p.items[o.it.id]||0, to=Math.min(MAX_ITEM_LVL,l+RAR[o.r].step); for(let k=l;k<to;k++) o.it.ap(p); p.items[o.it.id]=to; }
     else if(o.kind==='up'){ o.u.ap(p, o.u.v*R.m); p.books[o.u.id]=(p.books[o.u.id]||0)+1; }
-    else if(p.w[o.id]) p.w[o.id].lvl=Math.min(MAX_WEP_LVL, p.w[o.id].lvl+(o.r>=2?2:1)); else { addWeapon(o.id); if(o.r>=2) p.w[o.id].lvl=2; }
+    else if(p.w[o.id]) p.w[o.id].lvl=Math.min(MAX_WEP_LVL, p.w[o.id].lvl+RAR[o.r].step); else { addWeapon(o.id); p.w[o.id].lvl=RAR[o.r].step; }
     if(G.chestMode) G.chestMode=false; else G.pending--;
     if(G.pending>0) openQuiz(); else resume(); };
   show('ovPick');
