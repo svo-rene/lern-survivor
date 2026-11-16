@@ -29,7 +29,7 @@ KERKER_FRAGEN.push(
   { burg: 29, stufe: 1, art: 'wahl', frage: 'Auf welchem Protokoll beruht `ping` (Echo Request und Echo Reply)?',
     optionen: ['ICMP', 'ARP', 'TCP', 'DNS'],
     erkl: 'ICMP (Internet Control Message Protocol) dient Diagnose- und Fehlermeldungen auf der Internetschicht; ping nutzt Echo Request/Echo Reply.', quelle: 'OPAL LB7 7.5 IP-Adressierung und Routing (ICMP)' },
-  { burg: 29, stufe: 1, art: 'wahl', frage: 'Ein Laptop zeigt nach dem Verbinden die Adresse `169.254.13.7` und hat kein Netz. Was ist die wahrscheinlichste Ursache?',
+  { burg: 29, stufe: 1, art: 'wahl', frage: 'Ein Laptop zeigt nach dem Verbinden die Adresse `169.254.13.7` und kommt nicht ins Internet. Was ist die wahrscheinlichste Ursache?',
     optionen: ['Er hat keinen DHCP-Server erreicht, z. B. weil dieser ausgefallen oder der Pool voll ist.', 'Er hat vom DHCP-Server eine öffentliche Adresse bekommen.', 'Der DNS-Server kann den Namen des Laptops nicht auflösen.', 'Das Standard-Gateway hat ihm per NAT diese Adresse zugeteilt.'],
     erkl: 'Eine Adresse 169.254.x.x bildet sich ein Gerät selbst, wenn keine DHCP-Antwort kommt. Ursache ist meist ein ausgefallener DHCP-Server oder ein voller Adress-Pool.', quelle: 'OPAL LB7 7.7 DHCP (Praxisbezug, Aufgabe 7.7.7)' },
 

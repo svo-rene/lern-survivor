@@ -18,7 +18,7 @@ KERKER_FRAGEN.push(
     quelle: 'OPAL LB8 8.15 Datensicherung und RAID' },
   { burg: 26, stufe: 1, art: 'wahl', frage: 'Ein Angreifer weiß, dass jede verschlüsselte Nachricht mit „Sehr geehrte Damen und Herren“ beginnt. Welche Angriffsart kann er nutzen?',
     optionen: ['Known-Plaintext-Angriff', 'Ciphertext-only-Angriff', 'Chosen-Plaintext-Angriff', 'Social Engineering'],
-    erkl: 'Er kennt Klartext-Geheimtext-Paare, ohne den Klartext selbst wählen zu können. Bei Vigenère liefert schon ein bekannter Klartext den Schlüssel.',
+    erkl: 'Er kennt Klartext-Geheimtext-Paare, ohne den Klartext selbst wählen zu können. Bei Vigenère liefert schon ein bekannter Klartext den Schlüssel, wenn er mindestens so lang ist wie das Schlüsselwort.',
     quelle: 'OPAL LB8 8.6 Kryptoanalyse (Aufgabe 8.6.1)' },
 
   // ---------------- Stufe 2 ----------------
@@ -44,7 +44,7 @@ KERKER_FRAGEN.push(
   // (Fragen zu inkrementeller/differenzieller Sicherung auf Wunsch gestrichen, 2026-11-16)
   { burg: 26, stufe: 3, art: 'wahl', frage: 'Ein Angreifer schneidet heute TLS-1.3-Verbindungen mit und erbeutet in zwei Jahren den privaten Schlüssel des Servers. Kann er die alten Mitschnitte entschlüsseln?',
     optionen: ['Nein – die Session-Keys entstanden per (EC)DHE und wurden nie übertragen; der private Schlüssel diente nur zum Signieren.', 'Ja – damit entschlüsselt er den übertragenen Sitzungsschlüssel.', 'Ja – TLS verschlüsselt alle Daten direkt mit dem privaten Schlüssel.', 'Nein – TLS-Daten werden gar nicht verschlüsselt, nur signiert.'],
-    erkl: 'Forward Secrecy: Für jede Verbindung gibt es neue Diffie-Hellman-Werte, die danach verworfen werden. Beim alten RSA-Schlüsseltransport ginge der Angriff – deshalb erlaubt TLS 1.3 nur noch (EC)DHE.',
+    erkl: 'Forward Secrecy: Für jede Verbindung gibt es neue Diffie-Hellman-Werte, die danach verworfen werden. Beim alten RSA-Schlüsseltransport ginge der Angriff – deshalb hat TLS 1.3 den RSA-Schlüsseltransport abgeschafft.',
     quelle: 'OPAL LB8 7.11 TLS und VPN (Aufgabe 7.11.5)' },
   { burg: 26, stufe: 3, art: 'wahl', frage: 'Der Browser warnt vor einem abgelaufenen Zertifikat. Der Hausmeister: „Klick auf ‚Trotzdem fortfahren‘, verschlüsselt ist die Verbindung doch trotzdem.“ Welche Beurteilung ist stichhaltig?',
     optionen: ['Verschlüsselt ja – aber ohne gültiges Zertifikat ist nicht gesichert, mit wem. Es könnte ein Angreifer in der Mitte sein.', 'Der Rat stimmt: Das Zertifikat dient nur der Verschlüsselung, und die findet statt.', 'Der Rat stimmt: Ein abgelaufenes Zertifikat ist nur eine Formsache ohne Sicherheitsbedeutung.', 'Falsch: Ohne gültiges Zertifikat wird gar nichts verschlüsselt, die Daten gehen im Klartext.'],

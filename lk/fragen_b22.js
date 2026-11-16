@@ -225,7 +225,7 @@ KERKER_FRAGEN.push(
   { id: 'k22_039', burg: 22, kap: 44, stufe: 3, art: 'wahl',
     frage: 'Jeder Schritt kostet −1, das Ziel bringt +10. Warum ist die Strafe pro Schritt sinnvoll?',
     optionen: ['Kurze Wege sammeln weniger Strafe als lange Umwege', 'Damit die Q-Werte beim Lernen nie positiv werden', 'Damit der Agent häufiger zufällige Schritte probiert', 'Ohne Strafe könnte der Agent das Ziel nicht erkennen'],
-    erkl: 'Ohne Schrittkosten wären lange Umwege genauso gut wie kurze Wege, solange das Ziel irgendwann erreicht wird.',
+    erkl: 'Ohne Schrittkosten (und ohne Abzinsung γ) wären lange Umwege genauso gut wie kurze Wege, solange das Ziel irgendwann erreicht wird.',
     quelle: 'Sternwarte Kapitel 44; OPAL LK LB 10/11, 11.2 (Belohnung und Bestrafung)' },
   { id: 'k22_040', burg: 22, kap: 44, stufe: 2, art: 'zeile',
     frage: 'Die Lernregel soll Q(zustand, aktion) verbessern. Der Agent lernt aber nie, dass ein Weg später zum Ziel führt. Tippe die fehlerhafte Zeile an.',

@@ -60,7 +60,7 @@ KERKER_FRAGEN.push(
     erkl: 'S → aSc koppelt die Anzahl der a an die der c (auch 0-mal möglich), B erzeugt mindestens ein b. Die Anzahl der b ist unabhängig.', quelle: 'OPAL LB6 6.15.2 (Musterlösung)' },
   { id: 'k27_015', burg: 27, kap: 91, stufe: 3, art: 'wahl', frage: 'Warum gehört P = { S → aSc | B, B → bB | b } nicht zum Typ 3?',
     optionen: ['In aSc steht hinter dem Nichtterminal noch ein Terminal', 'Weil die Grammatik zwei verschiedene Nichtterminale hat', 'Weil auf der linken Seite mehr als ein Symbol steht', 'Weil die Grammatik auch das leere Wort erzeugen kann'],
-    erkl: 'Bei Typ 3 steht rechts höchstens ein Nichtterminal, und zwar ganz hinten. Regulär sind nur Regeln A → aB oder A → a. Die Grammatik ist kontextfrei (Typ 2), und die Sprache ist auch nicht regulär, weil die Anzahl der a und c übereinstimmen muss.', quelle: 'OPAL LB6 6.15.2 (Musterlösung)' },
+    erkl: 'Bei Typ 3 steht rechts höchstens ein Nichtterminal, und zwar ganz hinten. Regulär sind nur Regeln A → aB oder A → a (auch S → B passt streng genommen nicht). Die Grammatik ist kontextfrei (Typ 2), und die Sprache ist auch nicht regulär, weil die Anzahl der a und c übereinstimmen muss.', quelle: 'OPAL LB6 6.15.2 (Musterlösung)' },
 
   // ---------- Kapitel 92: Endliche Automaten ----------
   { id: 'k27_016', burg: 27, kap: 92, stufe: 1, art: 'mehr', frage: 'Startzustand q0, Endzustand q1. Kreuze alle Wörter an, die der Automat akzeptiert.',
@@ -236,7 +236,7 @@ KERKER_FRAGEN.push(
   { id: 'k27_055', burg: 27, kap: 95, stufe: 2, art: 'eingabe', zahl: true, frage: 'Der Scanner kennt BEZEICHNER (Buchstabe, dann Buchstaben oder Ziffern), ZAHL, ZUWEISUNG, PLUS, MINUS, MAL, KLAMMER_AUF, KLAMMER_ZU und SEMIKOLON; Leerzeichen trennen nur. Wie viele Tokens erzeugt er für die Zeile?',
     code: 'gesamt3 = (preis + 15) * 2;', antworten: ['10'],
     erkl: 'gesamt3 | = | ( | preis | + | 15 | ) | * | 2 | ; – die Ziffer 3 gehört zum Bezeichner, weil der Scanner das längste passende Teilwort nimmt.', quelle: 'OPAL Abiturvorbereitung 5.1.11 b' },
-  { id: 'k27_056', burg: 27, kap: 95, stufe: 3, art: 'wahl', frage: 'Welche Phase meldet den Fehler in der Zeile 3preis = 5; und warum?',
+  { id: 'k27_056', burg: 27, kap: 95, stufe: 3, art: 'wahl', frage: 'Der Scanner kennt die Tokens BEZEICHNER, ZAHL, ZUWEISUNG … und nimmt das längste passende Teilwort. Welche Phase meldet den Fehler in der Zeile 3preis = 5; und warum?',
     optionen: ['die Syntaxanalyse: ZAHL BEZEICHNER ZUWEISUNG passt zu keiner Regel', 'die lexikalische Analyse: Ein Bezeichner darf nicht mit einer Ziffer beginnen', 'die semantische Analyse, weil 3preis nirgends festgelegt wurde', 'keine Phase, denn die Zeile ist ein korrekter Befehl'],
     erkl: 'Der Scanner bildet gültige Tokens ZAHL(3) BEZEICHNER(preis). Erst in Tokens zerlegen: Für 3 und preis gibt es passende Tokens, also kein FEHLER-Token. Die Reihenfolge der Tokens verletzt die Grammatik.', quelle: 'OPAL Abiturvorbereitung 5.1.11 c' },
   { id: 'k27_057', burg: 27, kap: 95, stufe: 3, art: 'wahl', frage: 'Warum kann der Fehler „Variable wurde nie festgelegt“ weder vom Scanner noch vom Parser gefunden werden?',

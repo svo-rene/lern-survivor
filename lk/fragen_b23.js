@@ -123,7 +123,7 @@ KERKER_FRAGEN.push(
   { id: 'k23_021', burg: 23, kap: 52, stufe: 1, art: 'wahl',
     frage: 'Wie setzt man in Python eine Beziehung mit der Multiplizität 0..* um?',
     optionen: ['als Attribut mit einer Liste von Objekten', 'als einzelnes Attribut, das None sein kann', 'durch Vererbung von der anderen Klasse', 'mit einer globalen Variablen für alle Objekte'],
-    erkl: 'Zum Beispiel self.__tuerme: list[Turm] = [].0..1 wird oft ein einzelnes Attribut (Objekt oder None), 0..* eine Liste.',
+    erkl: 'Zum Beispiel self.__tuerme: list[Turm] = []. 0..1 wird oft ein einzelnes Attribut (Objekt oder None), 0..* eine Liste.',
     quelle: 'OPAL LK LB 4/5, 4.9 Multiplizitäten; HEFT_MERKE 52' },
   { id: 'k23_022', burg: 23, kap: 52, stufe: 3, art: 'wahl',
     frage: 'Woran erkennst du im Code eher eine Komposition als eine Aggregation?',

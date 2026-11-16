@@ -106,7 +106,7 @@ KERKER_FRAGEN.push(
         erkl: `In UTF-32 belegt jedes Zeichen 4 Byte, egal welches: ${[...t].length} Zeichen · 4 = ${4 * [...t].length} Byte.` };
     } },
   { id: 'k28_020', burg: 28, kap: 101, stufe: 3, art: 'wahl', frage: 'Der Inhaber meint: „Wir bleiben bei ASCII. ASCII braucht nur 7 Bit pro Zeichen und spart damit gegenüber UTF-8 Platz.“ Welche Stellungnahme ist stichhaltig?',
-    optionen: ['Stimmt nicht: Auch ASCII belegt 1 Byte, UTF-8 für diese Zeichen ebenso', 'Stimmt, UTF-8 braucht für jedes Zeichen mindestens 2 Byte', 'Stimmt, weil 7 Bit je Zeichen weniger sind als 8 Bit', 'Stimmt nicht, weil ASCII 16 Bit für jedes Zeichen braucht'],
+    optionen: ['Stimmt nicht: Auch ASCII belegt 1 Byte, UTF-8 für ASCII-Zeichen ebenso', 'Stimmt, UTF-8 braucht für jedes Zeichen mindestens 2 Byte', 'Stimmt, weil 7 Bit je Zeichen weniger sind als 8 Bit', 'Stimmt nicht, weil ASCII 16 Bit für jedes Zeichen braucht'],
     erkl: 'Im Speicher belegt auch ein ASCII-Zeichen ein ganzes Byte; Ø oder € kann ASCII gar nicht darstellen. Für reine ASCII-Texte sind ASCII und UTF-8 gleich groß. UTF-8 braucht nur für Sonderzeichen mehr Platz – die ASCII gar nicht kennt.', quelle: 'OPAL Abiturvorbereitung 1.1.11 d' },
 
   // ---------- Kapitel 162: Daten kompakt – Huffman ----------
@@ -277,7 +277,7 @@ KERKER_FRAGEN.push(
     } },
   { id: 'k28_062', burg: 28, kap: 164, stufe: 3, art: 'wahl', frage: 'Ein Händler wirbt: „4 GHz statt 2 GHz – doppelt so schnell!“ Das Programm muss oft auf Daten aus dem Arbeitsspeicher warten. Beurteile.',
     optionen: ['Stimmt nicht: Die Wartezeit auf den Speicher bleibt gleich', 'Stimmt immer, die Laufzeit halbiert sich bei doppeltem Takt', 'Stimmt, mit großem Cache wird es sogar mehr als doppelt so schnell', 'Stimmt nicht, ein höherer Takt macht Programme langsamer'],
-    erkl: 'Nur der Taktanteil halbiert sich, die Wartezeit auf den Arbeitsspeicher hängt nicht vom Prozessortakt ab. Beispiel: 0,5 ns + 3 ns Wartezeit = 3,5 ns, mit 4 GHz 0,25 ns + 3 ns = 3,25 ns – nur etwa 7 % schneller.', quelle: 'OPAL LB1 6.2 Übungsstunde, Station 5.6; Abiturvorbereitung 1.1.1 f' },
+    erkl: 'Nur der Taktanteil halbiert sich, die Wartezeit auf den Arbeitsspeicher hängt nicht vom Prozessortakt ab. Beispiel: 0,5 ns + 3 ns Wartezeit = 3,5 ns, mit 4 GHz 0,25 ns + 3 ns = 3,25 ns – die Laufzeit sinkt nur um etwa 7 %.', quelle: 'OPAL LB1 6.2 Übungsstunde, Station 5.6; Abiturvorbereitung 1.1.1 f' },
   { id: 'k28_063', burg: 28, kap: 164, stufe: 3, art: 'wahl', frage: '„Mein Prozessor hat 4 Kerne mit Multithreading, also 8 Threads. Damit ist er genauso schnell wie ein Prozessor mit 8 Kernen.“ Welche Stellungnahme ist stichhaltig?',
     optionen: ['Nur teilweise: Es gibt trotzdem nur 4 Rechenwerke', 'Stimmt, 8 Threads entsprechen genau 8 echten Kernen', 'Stimmt nicht, Multithreading macht einen Prozessor langsamer', 'Stimmt, weil Multithreading den Takt jedes Kerns verdoppelt'],
     erkl: 'Beim Multithreading nutzt ein Kern Wartezeiten für einen zweiten Befehlsstrom; 8 echte Kerne rechnen 8 Threads wirklich gleichzeitig. Multithreading füllt Lücken, verdoppelt aber nicht die Rechenleistung. Ein Programm mit nur einem Thread profitiert von beidem kaum.', quelle: 'OPAL Abiturvorbereitung 1.1.8 d' },
