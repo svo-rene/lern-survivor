@@ -1,6 +1,8 @@
 # 🧙 Lern-Survivor
 
-Ein kleines Survivor-Spiel für den Informatikunterricht: Gegnerwellen überleben, Kristalle sammeln – und **bei jedem Level-up eine Frage beantworten**. Richtige und schnelle Antworten sowie Streaks bringen 🍀 Glück auf seltene Karten. Falsch beantwortete Fragen kommen später wieder.
+Ein kleines Survivor-Spiel für den Informatikunterricht: Gegnerwellen überleben, Kristalle sammeln – und **bei jedem Level-up eine Frage beantworten**. Richtige und schnelle Antworten sowie Streaks bringen 🍀 Glück auf seltene Karten. Falsch beantwortete Fragen kommen später wieder – auch in der nächsten Runde. Nach 10 Minuten kommt der Endboss **🎓 Der Tutor**: Wer ihn besiegt, hat die Runde bestanden.
+
+**📓 Hefter:** Mit richtigen Antworten schaltet man Hefterseiten frei (Merke + Beispiel, je Lernbereich 14–18 Seiten, Ordner `heft/`). Klassen werden über Lernziele freigeschaltet.
 
 **Spielen:** [lern-survivor.de](https://lern-survivor.de) öffnen – läuft im Browser auf PC, Tablet und Handy, ohne Anmeldung.
 

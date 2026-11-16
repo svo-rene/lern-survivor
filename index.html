@@ -44,6 +44,11 @@ pre.code{background:#0008;color:#a7f3d0;font:15px/1.45 Consolas,monospace;paddin
 .ans{display:block;width:100%;text-align:left;margin:7px 0;padding:12px;border-radius:10px;border:2px solid var(--line);background:#0e1914;color:var(--ink);font:inherit;font-size:16px;cursor:pointer}
 .ans.ok{border-color:var(--ok);background:#0f3320} .ans.bad{border-color:var(--bad);background:#3a1414}
 #bonus{height:7px;border-radius:4px;background:#0008;overflow:hidden;margin-top:4px} #bonus i{display:block;height:100%;background:var(--acc)}
+#bonus.read i{background:#60a5fa} #qans.wait{display:none}
+.spark{position:fixed;z-index:20;pointer-events:none;font-style:normal;color:#fde047;font-weight:900;font-size:18px;animation:spark .75s ease-out forwards}
+@keyframes spark{to{transform:translate(var(--dx),var(--dy)) scale(.4);opacity:0}}
+#box_q.win{animation:pop .35s} #box_q.lose{animation:shake .35s}
+@keyframes pop{40%{transform:scale(1.03)}} @keyframes shake{20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
 .meta{display:flex;justify-content:space-between;font-size:13px;color:var(--mut)}
 #fb{margin-top:10px;padding:10px;border-radius:10px;background:#0006;display:none;line-height:1.4}
 .r0{border-color:var(--r0)!important} .r1{border-color:var(--r1)!important;box-shadow:0 0 10px #60a5fa55} .r2{border-color:var(--r2)!important;box-shadow:0 0 14px #c084fc66} .r3{border-color:var(--r3)!important;box-shadow:0 0 20px #fbbf2488}
@@ -55,6 +60,24 @@ pre.code{background:#0008;color:#a7f3d0;font:15px/1.45 Consolas,monospace;paddin
 .board td:nth-child(3){font-weight:800;color:var(--acc);text-align:right} .board td:last-child{color:var(--mut);font-size:13px;text-align:right}
 .board tr.me td{background:#3a2f0b}
 .hint{font-size:13px;color:var(--mut)}
+/* Ausweichen, Hefter, Bilanz, Handy */
+#dashBtn{position:fixed;right:18px;bottom:22px;width:68px;height:68px;border-radius:50%;border:2px solid #fff6;background:#0009;color:#fff;font-size:30px;display:none;z-index:3;touch-action:none}
+body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
+@media (hover:hover) and (pointer:fine){ #dashBtn{width:54px;height:54px;font-size:24px} }
+#heftArea{width:100%;padding:9px;border-radius:10px;background:#0e1914;color:var(--ink);border:2px solid var(--line);font:inherit;font-size:16px}
+.page{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;background:#0006}
+.page h3{margin:0 0 6px;font-size:16px} .page p{margin:4px 0;line-height:1.45}
+.page.lock{opacity:.55} .page.lock h3{color:var(--mut)} .page.neu{border-color:var(--acc);box-shadow:0 0 10px #fde04744}
+.dmgrow{display:flex;align-items:center;gap:8px;font-size:14px;margin:3px 0} .dmgrow b{flex:0 0 130px;font-weight:600}
+.dmgrow i{display:block;height:10px;border-radius:5px;background:linear-gradient(90deg,#f59e0b,#ef4444)} .dmgrow span{color:var(--mut);font-size:12px}
+.retry .ans{font-size:15px;padding:9px}
+@media (max-width:600px){
+  #pas{display:none} #hp{width:80px} .row{gap:9px;font-size:14px}
+  .slot{width:25px;height:25px;font-size:14px;border-radius:6px} .slot i{font-size:10px;line-height:13px;padding:0 3px}
+  .sl-l{width:16px;font-size:12px} .sl-f{font-size:10px}
+  #qtext{font-size:17px} pre.code{font-size:13px} .ans{padding:10px;font-size:15px}
+}
+
 /* Startbildschirm */
 #ovStart{background:radial-gradient(ellipse at 50% 30%,#0000 0%,#0006 60%,#000b 100%);align-items:flex-start;overflow:auto}
 .startWrap{width:100%;max-width:980px;margin:auto;display:grid;grid-template-columns:1fr;gap:14px;padding:8px 0 24px}
@@ -94,7 +117,7 @@ pre.code{background:#0008;color:#a7f3d0;font:15px/1.45 Consolas,monospace;paddin
   <header class="hero">
     <div class="logo"><span class="l1">LERN</span><span class="l2">SURVIVOR</span></div>
     <p class="tag">Überlebe die Wellen – <b>mit deinem Wissen</b>.</p>
-    <div class="pills"><span>⬆️ Level-up = Frage</span><span>⚡ schnell + richtig = 🍀 Glück</span><span>🔥 Streaks</span><span>📦 Kisten</span></div>
+    <div class="pills"><span>⬆️ Level-up = Frage</span><span>⚡ schnell + richtig = 🍀 Glück</span><span>🔥 Streaks</span><span>📦 Kisten</span><span>🎓 nach 10 Min.: der Tutor</span></div>
   </header>
   <div class="box sbox">
     <h2>Dein Spitzname</h2><input id="nick" maxlength="16" placeholder="z. B. Bitzauberer" autocomplete="off" spellcheck="false">
@@ -103,20 +126,22 @@ pre.code{background:#0008;color:#a7f3d0;font:15px/1.45 Consolas,monospace;paddin
     <h2>Karte</h2><div class="cards" id="selMap"></div>
     <label class="chk"><input type="checkbox" id="tipsChk"> 💡 Tipps beim Spielen zeigen (kommen beim ersten Spiel automatisch)</label>
     <button class="btn go" id="startBtn">▶ Los geht's</button>
-    <p class="hint" style="text-align:center">WASD / Pfeiltasten oder auf dem Bildschirm ziehen · Angriffe gehen automatisch</p>
+    <button class="btn" id="heftBtn" style="background:#334155;color:var(--ink);font-size:16px">📓 Mein Hefter <span id="heftInfo" style="font-weight:600;color:var(--mut)"></span></button>
+    <p class="hint" style="text-align:center">WASD / Pfeiltasten oder auf dem Bildschirm ziehen · Leertaste oder 💨 = ausweichen · Angriffe gehen automatisch</p>
   </div>
   <div class="box sbox">
     <h2 style="margin-top:0">🏆 Bestenliste (dieses Gerät)</h2><div id="board"></div>
-    <p class="hint">Punkte: 100 je richtige Antwort + 1 je Sekunde + 20 je Stufe des besten Streaks.</p>
+    <p class="hint">Punkte: 100 je richtige Antwort + 1 je Sekunde + 20 je Stufe des besten Streaks + 1000 für den Sieg über den Tutor (🎓). Zusatzfragen beim Neu-Würfeln zählen nicht.</p>
   </div>
 </div></div>
 
 <!-- Frage -->
-<div class="ov" id="ovQuiz"><div class="box">
+<div class="ov" id="ovQuiz"><div class="box" id="box_q">
   <div class="meta"><span id="qinfo"></span><span id="qluck"></span></div>
   <div id="bonus"><i></i></div>
   <div class="thint" id="qHint"></div>
   <div id="qtext"></div>
+  <button class="btn" id="qRead" style="display:none;background:#1e3a5f;color:var(--ink);font-size:15px">📖 Lies die Frage … Antworten jetzt zeigen ▶</button>
   <div id="qans"></div>
   <div id="fb"></div>
   <button class="btn" id="qNext" style="display:none">Weiter zur Auswahl</button>
@@ -136,17 +161,33 @@ pre.code{background:#0008;color:#a7f3d0;font:15px/1.45 Consolas,monospace;paddin
 <div class="ov" id="ovPause"><div class="box">
   <h1>⏸ Pause</h1><div id="pauseInfo"></div>
   <button class="btn" id="resumeBtn">▶ Weiter</button>
+  <button class="btn" id="pauseHeft" style="background:#334155;color:var(--ink);font-size:15px">📓 Hefter ansehen</button>
+  <button class="btn" id="quitBtn" style="background:#3a1414;color:var(--ink);font-size:15px">⏹ Runde beenden</button>
 </div></div>
 
 <!-- Ende -->
 <div class="ov" id="ovOver"><div class="box">
-  <h1>💀 Vorbei</h1>
+  <h1 id="overTitle">Vorbei</h1>
   <div id="overPts" style="font-size:22px;font-weight:800;margin:6px 0 10px"></div>
   <div class="stat" id="overStats"></div>
+  <div id="overBreak" class="hint" style="margin-top:8px"></div>
+  <h2>⚔️ Schaden je Waffe</h2><div id="overDmg"></div>
   <h2>🏆 Bestenliste</h2><div id="overBoard"></div>
-  <h2>Das solltest du wiederholen</h2><div id="overWrong"></div>
+  <h2>Das solltest du wiederholen</h2><div id="overRetry"></div><div id="overWrong"></div>
   <button class="btn" id="againBtn">↻ Nochmal</button>
+  <button class="btn" id="menuBtn" style="background:#334155;color:var(--ink);font-size:15px">🏠 Zum Menü</button>
 </div></div>
+
+<!-- Hefter -->
+<div class="ov" id="ovHeft"><div class="box">
+  <h1 style="font-size:22px">📓 Mein Hefter</h1>
+  <p class="hint">Mit jeder richtigen Antwort im Lernbereich schaltest du Seiten frei: erste Seite sofort, dann alle 3 richtigen eine weitere.</p>
+  <select id="heftArea"></select>
+  <div id="heftStats" class="hint" style="margin:8px 0"></div>
+  <div id="heftPages"></div>
+  <button class="btn" id="heftClose">Schließen</button>
+</div></div>
+<button id="dashBtn" aria-label="Ausweichen">💨</button>
 
 <script src="fragen.js"></script>
 <script>window.KERKER_FRAGEN = [];</script>
@@ -166,6 +207,9 @@ pre.code{background:#0008;color:#a7f3d0;font:15px/1.45 Consolas,monospace;paddin
 <script src="lk/extra_datenbank.js"></script>
 <script src="lk/extra_sicherheit.js"></script>
 <script src="lk.js"></script>
+<script src="heft/python.js"></script><script src="heft/algo.js"></script><script src="heft/daten.js"></script>
+<script src="heft/ki.js"></script><script src="heft/technik.js"></script><script src="heft/oop.js"></script><script src="heft/netze.js"></script>
+<script src="heft/automaten.js"></script><script src="heft/datenbank.js"></script><script src="heft/sicherheit.js"></script>
 <script src="vendor/three.min.js"></script>
 <script src="render3d.js"></script>
 <script>
@@ -231,14 +275,18 @@ const ITEMS = [
   {id:'stiefel', icon:'🪽', name:'Flügelschuhe', txt:'+10% Laufgeschwindigkeit', ap:p=>p.speed*=1.1},
   {id:'herz', icon:'💗', name:'Drachenherz', txt:'+25 max. Leben, +0,4 Leben/s', ap:p=>{p.maxHp+=25;p.hp+=25;p.regen+=.4}},
 ];
-const GOLD_DROP = {bug:[.2,1], glitch:[.28,1], lock:[1,4], boss:[1,30]};   // [Chance, Menge]
+const GOLD_DROP = {bug:[.2,1], glitch:[.28,1], lock:[1,4], boss:[1,30], spam:[.5,1], fork:[.4,1], over:[.7,2], tutor:[1,60]};   // [Chance, Menge]
 const chestCost = () => 10 + G.opened*5;
 CLASSES.forEach(c=>c.desc=`Start: ${WEAPONS[c.weapon].icon} ${WEAPONS[c.weapon].name}. ${c.pas}`);
 const FOES = {
   bug:    {r:11, hp:14, sp:62,  dmg:12, xp:1, col:'#f87171', name:'Bug'},
   glitch: {r:9,  hp:9,  sp:118, dmg:10, xp:1, col:'#e879f9', name:'Glitch'},
   lock:   {r:18, hp:70, sp:42,  dmg:22, xp:4, col:'#94a3b8', name:'Deadlock'},
-  boss:   {r:40, hp:1400,sp:56, dmg:45, xp:40,col:'#ef4444', name:'Endlosschleife'},
+  boss:   {r:40, hp:[3000,8000,16000],sp:56, dmg:45, xp:40,col:'#ef4444', name:'Endlosschleife', boss:true},
+  spam:   {r:13, hp:26, sp:60,  dmg:12, xp:2, col:'#facc15', name:'Spam'},        // hält Abstand, schießt
+  fork:   {r:12, hp:22, sp:72,  dmg:12, xp:2, col:'#4ade80', name:'Fork'},        // teilt sich beim Besiegen
+  over:   {r:15, hp:40, sp:52,  dmg:20, xp:3, col:'#fb923c', name:'Overflow'},    // stürmt plötzlich los
+  tutor:  {r:58, hp:[20000], sp:62, dmg:60, xp:0, col:'#f59e0b', name:'Der Tutor', boss:true},
 };
 
 // ================= Zustand =================
@@ -255,9 +303,12 @@ function newGame(){
   const p = {x:0,y:0,r:14,hp:120,maxHp:120,regen:.5,speed:170,magnet:95,dmg:1,rate:1,count:0,size:1,crit:.05,luck:0,armor:0,
     w:{}, books:{}, items:{}, goldMul:1, xpMul:1, revive:0, lifesteal:0, thorns:0, castN:0, face:1, dx:1, dy:0, hurtT:0};
   G = {p, t:0, en:[], shots:[], slashes:[], meteors:[], pools:[], gold:0, chests:[], opened:0, chestMode:false, goldMsgT:0, fx:[], gems:[], bolts:[], level:1, xp:0, need:xpNeed(1), pending:0, kills:0,
-       spawnAcc:0, nextBoss:150, streak:0, best:0, diff:1, recent:[], asked:new Set(), review:[], hist:[], wrongs:[], lastLuck:0};
+       spawnAcc:0, nextBoss:150, streak:0, best:0, diff:1, recent:[], asked:new Set(), review:[], hist:[], wrongs:[], lastLuck:0, rrOk:0, lastOk:false, lastReroll:false, rerollQ:false, nums:[], dmgBy:{}, hurtGlow:0, luT:0, lastHit:'', eshots:[], bossN:0, won:false, winT:0, tutorOn:false};
   const C=choice.cls; G.cls=C; p.maxHp=p.hp=C.hp; p.speed*=C.spd; R3.setLook(C.robe, C.hat);
   addWeapon(C.weapon);
+  G.gold=prog.startGold||0; prog.startGold=0; saveProg();
+  const A=areaProg(choice.area.id); G.due=choice.area.fragen.filter(f=>A.box[qKey(f)]!==undefined && A.box[qKey(f)]<=prog.runs).sort(()=>Math.random()-.5);
+  if(G.due.length) setTimeout(()=>toast(`🔁 ${G.due.length} Frage${G.due.length>1?'n':''} aus früheren Runden kommen wieder`),400);
 }
 const xpNeed = l => 2 + Math.floor(l*0.9 + l*l*0.035 + Math.max(0, l-8)**2*0.15 + Math.max(0, l-8)**3*0.01);   // vorn schnell, ab Level 8 deutlich steiler (dafür mehr Kisten)
 
@@ -267,38 +318,48 @@ function wDmg(base){ const p=G.p; return base*p.dmg; }
 // Klassen-Bonus, wächst mit dem Level
 const lvlBonus = k => (G.cls.scale[k]||0) * G.level;
 // Rückstoß weg von "from"; schwere Gegner bewegen sich weniger
-function knock(e, from, k){ const dx=e.x-from.x, dy=e.y-from.y, d=Math.hypot(dx,dy)||1, f=e.type==='boss'?.15:e.type==='lock'?.5:1; e.x+=dx/d*k*f; e.y+=dy/d*k*f; }
+function knock(e, from, k){ const dx=e.x-from.x, dy=e.y-from.y, d=Math.hypot(dx,dy)||1, f=FOES[e.type].boss?.12:e.type==='lock'?.5:1; e.x+=dx/d*k*f; e.y+=dy/d*k*f; }
 function critRoll(){ const p=G.p; p.castN++; return ((G.cls.id==='zauberer' && p.castN%4===0) || Math.random()<p.crit+lvlBonus('crit')) ? 2 : 1; }
 function nearest(x,y,max){ let b=null, bd=max*max; for(const e of G.en){ const d=(e.x-x)**2+(e.y-y)**2; if(d<bd){bd=d;b=e;} } return b; }
 
 function updWeapons(dt){
   const p=G.p, W_=p.w, rate=p.rate*(1+lvlBonus('rate'));
+  const area = 1 + p.count*.15;   // Flächenwaffen: „Vielzahl“ macht die Fläche größer
   for(const id in W_){
-    const w=W_[id]; w.cd-=dt;
+    const w=W_[id]; w.cd-=dt; curSrc=id; const n0=G.shots.length, m0=G.meteors.length, q0=G.pools.length;
+    wTick(id, w, dt, p, rate, area);
+    for(let i=n0;i<G.shots.length;i++) G.shots[i].src=id;
+    for(let i=m0;i<G.meteors.length;i++) G.meteors[i].src=id;
+    for(let i=q0;i<G.pools.length;i++) G.pools[i].src=id;
+  }
+  curSrc='';
+}
+function wTick(id, w, dt, p, rate, area){
+  {
     if(id==='feuer' && w.cd<=0){
-      const t=nearest(p.x,p.y,520); if(!t){w.cd=.1;continue;}
+      const t=nearest(p.x,p.y,520); if(!t){w.cd=.1;return;}
       const n=1+p.count+Math.floor((w.lvl-1)/2), a0=Math.atan2(t.y-p.y,t.x-p.x);
       for(let i=0;i<n;i++){ const a=a0+(i-(n-1)/2)*.22, c=critRoll();
         G.shots.push({x:p.x,y:p.y,vx:Math.cos(a)*400,vy:Math.sin(a)*400,life:1.4,r:7*p.size*(c>1?1.4:1),dmg:wDmg(14+w.lvl*5)*c,boom:42*p.size*(1+w.lvl*.1),crit:c>1}); }
       w.cd = .85/(rate*(1+w.lvl*.08));
     }
     if(id==='blitz' && w.cd<=0){
-      let t=nearest(p.x,p.y,460); if(!t){w.cd=.1;continue;}
+      let t=nearest(p.x,p.y,460); if(!t){w.cd=.1;return;}
       const c=critRoll(), jumps=2+w.lvl+p.count, pts=[{x:p.x,y:p.y-10}], hit=new Set();
-      for(let j=0;j<jumps&&t;j++){ hit.add(t); pts.push({x:t.x,y:t.y}); hurt(t, wDmg(10+w.lvl*5)*c);
+      for(let j=0;j<jumps&&t;j++){ hit.add(t); pts.push({x:t.x,y:t.y}); hurt(t, wDmg(10+w.lvl*5)*c, c>1);
         let nb=null,bd=(150*p.size)**2; for(const e of G.en){ if(hit.has(e)||e.dead)continue; const d=(e.x-t.x)**2+(e.y-t.y)**2; if(d<bd){bd=d;nb=e;} } t=nb; }
       G.bolts.push({pts, life:.18});
       w.cd = 1.6/(rate*(1+w.lvl*.06));
     }
     if(id==='frost'){
-      const n=2+w.lvl+p.count, R=70*p.size+w.lvl*6; w.ang+=dt*(2.4+w.lvl*.15);
+      const n=2+w.lvl+p.count, R=70*p.size+w.lvl*6; w.ang+=dt*(2.4+w.lvl*.15)*Math.min(2,rate);   // Eile: dreht schneller
       w.pts=[]; for(let i=0;i<n;i++){ const a=w.ang+i*Math.PI*2/n; w.pts.push({x:p.x+Math.cos(a)*R,y:p.y+Math.sin(a)*R}); }
       for(const e of G.en){ for(const q of w.pts){ if((e.x-q.x)**2+(e.y-q.y)**2 < (e.r+9*p.size)**2 && (e.frostCd||0)<=0){
-        hurt(e, wDmg(8+w.lvl*4)*(Math.random()<p.crit?2:1)); e.slow=1.2; e.frostCd=.35; } } }
+        const c=critRoll(); hurt(e, wDmg(8+w.lvl*4)*c, c>1); e.slow=1.2; e.frostCd=.35/Math.min(2,rate); } } }
     }
     if(id==='meteor' && w.cd<=0){
-      const near=G.en.filter(e=>(e.x-p.x)**2+(e.y-p.y)**2<420*420); if(!near.length){w.cd=.2;continue;}
-      const n=1+Math.floor(w.lvl/3)+(p.count>0?1:0);
+      const near=G.en.filter(e=>(e.x-p.x)**2+(e.y-p.y)**2<420*420); if(!near.length){w.cd=.2;return;}
+      const n=1+Math.floor(w.lvl/3)+p.count;
       for(let i=0;i<n;i++){ const t=near[Math.floor(Math.random()*near.length)], c=critRoll();
         G.meteors.push({x:t.x,y:t.y,t:.55,max:.55,R:(55+w.lvl*7)*p.size,dmg:wDmg(30+w.lvl*12)*c}); }
       w.cd = 2.6/(rate*(1+w.lvl*.06));
@@ -311,42 +372,54 @@ function updWeapons(dt){
     }
     if(id==='gift' && w.cd<=0){
       const t=nearest(p.x,p.y,300), x=t?t.x:p.x, y=t?t.y:p.y;
-      G.pools.push({x,y,R:(45+w.lvl*6)*p.size,life:3+w.lvl*.3,tick:0,dmg:wDmg(5+w.lvl*3)});
+      // Gift: stärker als früher, bremst; Vielzahl = mehr Pfützen rundherum
+      for(let i=0;i<=p.count;i++){ const a=i*2.4, d=i?70*p.size:0;
+        G.pools.push({x:x+Math.cos(a)*d,y:y+Math.sin(a)*d,R:(48+w.lvl*7)*p.size,life:3+w.lvl*.3,tick:0,dmg:wDmg(7+w.lvl*4),slow:true}); }
       w.cd = 2.4/(rate*(1+w.lvl*.05));
     }
     if(id==='klinge' && w.cd<=0){
-      const t=nearest(p.x,p.y,400); if(!t){w.cd=.2;continue;}
-      const n=1+Math.floor((w.lvl-1)/3)+(p.count>1?1:0), a0=Math.atan2(t.y-p.y,t.x-p.x);
+      const t=nearest(p.x,p.y,400); if(!t){w.cd=.2;return;}
+      const n=1+Math.floor((w.lvl-1)/3)+p.count, a0=Math.atan2(t.y-p.y,t.x-p.x);
       for(let i=0;i<n;i++){ const a=a0+i*Math.PI*2/n, c=critRoll();
         G.shots.push({kind:'klinge',x:p.x,y:p.y,vx:Math.cos(a)*480,vy:Math.sin(a)*480,life:3,age:0,r:13*p.size,dmg:wDmg(12+w.lvl*5)*c,pierce:99,hit:new Set(),crit:c>1}); }
       w.cd = 1.7/(rate*(1+w.lvl*.06));
     }
     if(id==='schwert' && w.cd<=0){
-      const R=(75+w.lvl*7)*p.size, tg=nearest(p.x,p.y,R+60), a=tg?Math.atan2(tg.y-p.y,tg.x-p.x):Math.atan2(p.dy,p.dx);
+      const R=(75+w.lvl*7)*p.size*area, tg=nearest(p.x,p.y,R+60), a=tg?Math.atan2(tg.y-p.y,tg.x-p.x):Math.atan2(p.dy,p.dx);
       const half=w.lvl>=8?Math.PI:w.lvl>=5?Math.PI*.5:Math.PI*.35, c=critRoll();
       for(const e of G.en){ const dx=e.x-p.x, dy=e.y-p.y, d=Math.hypot(dx,dy); if(d>R+e.r) continue;
         let da=Math.abs(Math.atan2(dy,dx)-a); if(da>Math.PI) da=2*Math.PI-da; if(da>half && d>e.r+p.r) continue;
-        hurt(e, wDmg(24+w.lvl*9)*c); knock(e, p, 34); }
+        hurt(e, wDmg(24+w.lvl*9)*c, c>1); knock(e, p, 34); }
       G.slashes.push({x:p.x,y:p.y,a,half,R,life:.2,max:.2,crit:c>1});
       w.cd = 1.05/(rate*(1+w.lvl*.06));
     }
     if(id==='schild'){
-      w.max=Math.min(4, 1+Math.floor(w.lvl/2.5)); w.layers=w.layers||0;
-      if(w.layers<w.max && w.cd<=0){ w.layers++; w.cd=Math.max(2.5, 5-w.lvl*.3); }   // bewusst ohne Angriffstempo
+      // Vielzahl = mehr Schichten, Eile = schneller nachladen; bricht eine Schicht, gibt es einen Schadensstoß (siehe update)
+      w.max=Math.min(6, 1+Math.floor(w.lvl/2.5)+p.count); w.layers=w.layers||0;
+      if(w.layers<w.max && w.cd<=0){ w.layers++; w.cd=Math.max(1.5, 5-w.lvl*.3)/Math.min(2,rate); }
       if(w.layers>=w.max) w.cd=Math.max(w.cd,.5);
     }
     if(id==='aura'){
-      w.R = (60+w.lvl*10)*p.size;
-      if(w.cd<=0){ for(const e of G.en) if((e.x-p.x)**2+(e.y-p.y)**2 < (w.R+e.r)**2) hurt(e, wDmg(4+w.lvl*3)); w.cd=.35; }
+      w.R = (60+w.lvl*10)*p.size*area;
+      if(w.cd<=0){ const c=critRoll(); for(const e of G.en) if((e.x-p.x)**2+(e.y-p.y)**2 < (w.R+e.r)**2) hurt(e, wDmg(5+w.lvl*4)*c, c>1); w.cd=.35/Math.min(2.2,rate); }
     }
   }
 }
-function hurt(e,d){
-  if(e.dead) return; e.hp-=d; e.flash=.08;
+// curSrc = welche Waffe gerade Schaden macht (für die Bilanz am Ende)
+let curSrc='';
+function hurt(e,d,crit){
+  if(e.dead) return; const real=Math.min(d, Math.max(0,e.hp)); e.hp-=d; e.flash=.08;
+  if(curSrc) G.dmgBy[curSrc]=(G.dmgBy[curSrc]||0)+real;
+  // Schadenszahl: kleine Treffer kurz hintereinander werden zusammengezählt
+  if(e.num && e.num.t>.55 && !e.num.crit) { e.num.v+=d; e.num.t=.8; }
+  else if(G.nums.length<45){ e.num={x:e.x,y:e.y,h:e.r*2+10,v:d,t:.8,crit:!!crit,boss:!!FOES[e.type].boss}; G.nums.push(e.num); }
   if(e.hp<=0){ e.dead=true; G.kills++; tip('gem');
+    G.fx.push({x:e.x,y:e.y,r:e.r*2.2,life:.22,max:.22,col:e.col});
+    if(FOES[e.type].boss) bossDown(e);
+    if(e.type==='fork') for(let i=0;i<2;i++){ const m=spawn('bug'); m.x=e.x+(i?10:-10); m.y=e.y; m.r=8; m.hp=m.max=e.max*.35; m.xp=1; }
     const gd=GOLD_DROP[e.type]; if(Math.random()<gd[0]) G.gems.push({x:e.x+8,y:e.y-6,v:0,gold:gd[1]});
     if(G.p.lifesteal) G.p.hp=Math.min(G.p.maxHp, G.p.hp+G.p.lifesteal);
-    const n = e.type==='boss'?12:1; for(let i=0;i<n;i++) G.gems.push({x:e.x+(Math.random()-.5)*e.r, y:e.y+(Math.random()-.5)*e.r, v:e.xp/n*(e.type==='boss'?1:1)});
+    const n = FOES[e.type].boss?12:1; for(let i=0;i<n;i++) G.gems.push({x:e.x+(Math.random()-.5)*e.r, y:e.y+(Math.random()-.5)*e.r, v:e.xp/n});
     if(e.type==='boss') G.gems.push({x:e.x,y:e.y,v:0,heal:true});
   }
 }
@@ -355,18 +428,58 @@ function hurt(e,d){
 function spawn(type){
   const p=G.p, a=Math.random()*Math.PI*2, d=Math.hypot(W,H)/2+60;
   // mit der Zeit mehr schnelle Glitches – irgendwann holen sie jeden ein
-  if(!type){ const r=Math.random(), gl=.23+Math.min(.45,G.t/900); type = (G.t>100&&r<.12)?'lock':(G.t>40&&r<.12+gl)?'glitch':'bug'; }
+  if(!type){ const r=Math.random(), gl=.23+Math.min(.45,G.t/900);
+    // neue Gegnerarten kommen erst nach und nach: Spam (3:00), Fork (4:30), Overflow (6:00)
+    if(G.t>360 && r<.06) type='over'; else if(G.t>270 && r<.13) type='fork'; else if(G.t>180 && r<.19) type='spam';
+    else { const q=Math.random(); type = (G.t>100&&q<.12)?'lock':(G.t>40&&q<.12+gl)?'glitch':'bug'; } }
   // Schwierigkeit wächst mit der Zeit immer schneller (eine Runde soll nach einigen Minuten enden)
   const f=FOES[type], hm=1+G.t/DIFF.hp+(G.t/DIFF.hp2)**2.2, sm=G.t<600 ? Math.min(3.5,1+G.t/DIFF.sp) : 1+G.t/DIFF.sp;   // ab ~6 Min. kaum noch weglaufen, ab 10 Min. gar nicht mehr
-  G.en.push({type, x:p.x+Math.cos(a)*d, y:p.y+Math.sin(a)*d, r:f.r, hp:f.hp*hm, max:f.hp*hm, sp:f.sp*sm, dmg:f.dmg*(1+G.t/DIFF.dmg+(G.t/DIFF.dmg2)**2), xp:f.xp, col:f.col, flash:0, slow:0});
+  const big=f.boss, hp=big ? f.hp[Math.min(f.hp.length-1, G.bossN||0)] : f.hp*hm;   // Bosse: feste Lebenspunkte
+  const e={type, x:p.x+Math.cos(a)*d, y:p.y+Math.sin(a)*d, r:f.r, hp, max:hp, sp:f.sp*(big?1:sm), dmg:f.dmg*(1+G.t/DIFF.dmg+(G.t/DIFF.dmg2)**2), xp:f.xp, col:f.col, flash:0, slow:0, ai:2.5, cd:1+Math.random()*2};
+  G.en.push(e); return e;
+}
+// Gegnerische Geschosse (Spam, Bosse)
+function eShoot(x,y,a,sp,dmg,col){ G.eshots.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,r:7,life:4.5,dmg,col}); }
+function hitPlayer(dmg, src){
+  const p=G.p; if(p.inv>0) return;
+  if(p.w.schild && p.w.schild.layers>0){ p.w.schild.layers--; p.inv=.25; G.fx.push({x:p.x,y:p.y,r:46,life:.25,max:.25,col:'#67e8f9'}); return; }
+  const hd=dmg*(1-Math.min(.75, p.armor+lvlBonus('armor'))); p.hp-=hd; p.hurtT=.12; p.inv=.15; G.hurtGlow=Math.min(1,G.hurtGlow+hd/12); G.lastHit=src; tip('hurt');
+}
+// Verhalten besonderer Gegner; gibt true zurück, wenn die normale Verfolgung entfällt
+function foeAI(e, dt, dx, dy, d){
+  const p=G.p, f=FOES[e.type];
+  if(e.dash>0){ e.dash-=dt; e.x+=e.dvx*dt; e.y+=e.dvy*dt; if(!e.dashHit && Math.hypot(p.x-e.x,p.y-e.y)<e.r+p.r+4){ e.dashHit=true; hitPlayer(e.dmg*.5, e.type); } return true; }
+  if(e.tele>0){ e.tele-=dt; if(e.tele<=0){ const a=Math.atan2(e.ty-e.y,e.tx-e.x), s=e.type==='over'?430:560; e.dvx=Math.cos(a)*s; e.dvy=Math.sin(a)*s; e.dash=e.type==='over'?.45:.7; e.dashHit=false; } return true; }
+  if(e.type==='spam'){   // hält Abstand und schießt langsame Kugeln
+    e.cd-=dt; if(e.cd<=0){ e.cd=2.8; eShoot(e.x,e.y,Math.atan2(dy,dx),170,e.dmg*.9,'#facc15'); }
+    if(d<240){ e.x-=dx/d*e.sp*.4*dt; e.y-=dy/d*e.sp*.4*dt; return true; } return false; }
+  if(e.type==='over'){ e.cd-=dt; if(e.cd<=0 && d<420){ e.cd=4.5; e.tele=.65; e.tx=p.x; e.ty=p.y; return true; } return false; }
+  if(f.boss){
+    const ph2=e.hp<e.max*.5, k=ph2?.7:1; e.cd-=dt;
+    if(e.cd<=0){ e.pat=(e.pat||0)+1;
+      const pats=e.type==='tutor'?['dash','ring','summon','ring']:['dash','ring'], pat=pats[e.pat%pats.length];
+      if(pat==='dash'){ e.tele=.9; e.tx=p.x; e.ty=p.y; }
+      if(pat==='ring'){ const n=(e.type==='tutor'?18:12)+(ph2?6:0), off=Math.random(); for(let i=0;i<n;i++) eShoot(e.x,e.y,(i+off)/n*Math.PI*2,e.type==='tutor'?190:160,e.dmg*.45,e.type==='tutor'?'#f59e0b':'#f43f5e'); }
+      if(pat==='summon'){ for(let i=0;i<6+(ph2?4:0);i++){ const m=spawn('glitch'); const a=i/6*Math.PI*2; m.x=e.x+Math.cos(a)*90; m.y=e.y+Math.sin(a)*90; } toast('📚 Der Tutor verteilt Hausaufgaben!'); }
+      e.cd=(e.type==='tutor'?3.2:4.5)*k; return pat==='dash'; }
+  }
+  return false;
+}
+// Boss besiegt: Endlosschleife lässt eine Gratis-Kiste fallen; der Tutor beendet die Runde mit einem Sieg
+function bossDown(e){
+  if(e.type==='tutor'){ G.won=true; G.winT=1.5; toast('🎓 Der Tutor ist besiegt – bestanden!'); return; }
+  G.chests.push({x:e.x, y:e.y, free:true}); toast('📦 Die Endlosschleife hinterlässt eine Gratis-Kiste!');
 }
 // Anfang sanft (linearer Teil), danach steigt es schnell (Potenz-Teil)
-const DIFF = {hp:60, hp2:95, sp:220, dmg:240, dmg2:160, spawn:30, spawn2:95};
+const DIFF = {hp:60, hp2:112, sp:220, dmg:240, dmg2:190, spawn:30, spawn2:105};   // so abgestimmt, dass gute Runden den Tutor bei 10:00 erreichen
 const spawnRate = () => Math.min(34, 0.7 + G.t/DIFF.spawn + (G.t/DIFF.spawn2)**2);
 
 // ================= Update =================
 const keys = {}; let joy = null;
-addEventListener('keydown', e=>{ keys[e.key.toLowerCase()]=true; if((e.key==='Escape'||e.key==='p')&&mode==='play') pause(); });
+addEventListener('keydown', e=>{ keys[e.key.toLowerCase()]=true; if((e.key==='Escape'||e.key==='p')&&mode==='play') pause(); if((e.key===' '||e.key==='Shift')&&mode==='play'){ e.preventDefault(); dash(); } });
+$('dashBtn').addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); dash(); });
+// Ausweichen: kurzer Sprint in Laufrichtung, dabei unverwundbar
+function dash(){ if(mode!=='play'||!G) return; const p=G.p; if((p.dashCd||0)>0) return; p.dashCd=2.2; p.dashT=.22; p.inv=Math.max(p.inv||0,.4); G.fx.push({x:p.x,y:p.y,r:40,life:.3,max:.3,col:'#e0f2fe'}); }
 addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
 cv.addEventListener('pointerdown', e=>{ if(mode==='play') joy={ox:e.clientX,oy:e.clientY,x:e.clientX,y:e.clientY,id:e.pointerId}; });
 addEventListener('pointermove', e=>{ if(joy&&e.pointerId===joy.id){joy.x=e.clientX;joy.y=e.clientY;} });
@@ -374,18 +487,23 @@ addEventListener('pointerup', e=>{ if(joy&&e.pointerId===joy.id) joy=null; });
 addEventListener('pointercancel', ()=>joy=null);
 
 function update(dt){
+  // Level-up-Moment: kurz Zeitlupe und „LEVEL UP!“, dann erst die Frage
+  if(G.luT>0){ G.luT-=dt; dt*=.3; }
   const p=G.p; G.t+=dt;
   let mx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0), my=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
   if(joy){ const dx=joy.x-joy.ox, dy=joy.y-joy.oy, l=Math.hypot(dx,dy); if(l>6){ mx=dx/Math.max(l,45); my=dy/Math.max(l,45); } }
   const l=Math.hypot(mx,my); if(l>1){mx/=l;my/=l;}
   const spd=Math.min(p.speed, 270);   // Obergrenze: sonst kann man allen Gegnern ewig davonlaufen
   p.x+=mx*spd*dt; p.y+=my*spd*dt; if(mx) p.face=Math.sign(mx);
+  p.dashCd=(p.dashCd||0)-dt; if(p.dashT>0){ p.dashT-=dt; p.x+=p.dx*720*dt; p.y+=p.dy*720*dt; }
   if(mx||my){ const ll=Math.hypot(mx,my); p.dx=mx/ll; p.dy=my/ll; }
   p.hp=Math.min(p.maxHp,p.hp+p.regen*dt); p.hurtT-=dt; p.inv=(p.inv||0)-dt;
 
-  G.spawnAcc+=dt*spawnRate(); while(G.spawnAcc>=1 && G.en.length<320){ G.spawnAcc--; spawn(); }
+  G.spawnAcc+=dt*spawnRate()*(G.tutorOn&&!G.won?.6:1); while(G.spawnAcc>=1 && G.en.length<320){ G.spawnAcc--; spawn(); }
   if(G.spawnAcc>1) G.spawnAcc=1;
-  if(G.t>=G.nextBoss){ spawn('boss'); G.nextBoss+=150; toast('⚠️ Endlosschleife naht!'); tip('boss'); }
+  if(G.t>=G.nextBoss && G.nextBoss<600){ spawn('boss'); G.bossN++; G.nextBoss+=150; toast('⚠️ Endlosschleife naht!'); tip('boss'); }
+  if(!G.tutorWarn && G.t>=585){ G.tutorWarn=true; toast('🎓 Gleich kommt der Tutor – die Abschlussprüfung!'); }
+  if(!G.tutorOn && G.t>=600){ G.tutorOn=true; spawn('tutor'); tip('tutor'); }
   if(G.level>=6 && Object.keys(p.w).length<2) tip('more');
 
   updWeapons(dt);
@@ -396,31 +514,35 @@ function update(dt){
       const dx=p.x-s.x, dy=p.y-s.y, d=Math.hypot(dx,dy)||1; s.vx=dx/d*560; s.vy=dy/d*560; if(d<18) s.life=0; } }
     s.x+=s.vx*dt; s.y+=s.vy*dt; s.life-=dt;
     for(const e of G.en){ if(e.dead||(s.hit&&s.hit.has(e))) continue; if((e.x-s.x)**2+(e.y-s.y)**2 < (e.r+s.r)**2){
-      hurt(e,s.dmg);
+      curSrc=s.src||""; hurt(e,s.dmg,s.crit);
       if(s.hit){ s.hit.add(e); if(--s.pierce<0){ s.life=0; break; } continue; }
       s.life=0;
-      for(const o of G.en) if(o!==e && (o.x-s.x)**2+(o.y-s.y)**2 < (s.boom+o.r)**2) hurt(o, s.dmg*.5);
+      for(const o of G.en) if(o!==e && (o.x-s.x)**2+(o.y-s.y)**2 < (s.boom+o.r)**2) hurt(o, s.dmg*.5);  curSrc="";
       G.fx.push({x:s.x,y:s.y,r:s.boom,life:.25,max:.25,col:s.crit?'#fde047':'#fb923c'}); break; } } }
   G.shots = G.shots.filter(s=>s.life>0);
-  for(const m of G.meteors){ m.t-=dt; if(m.t<=0){ for(const e of G.en) if((e.x-m.x)**2+(e.y-m.y)**2<(m.R+e.r)**2) hurt(e,m.dmg);
+  for(const m of G.meteors){ m.t-=dt; if(m.t<=0){ curSrc=m.src||""; for(const e of G.en) if((e.x-m.x)**2+(e.y-m.y)**2<(m.R+e.r)**2) hurt(e,m.dmg); curSrc="";
     G.fx.push({x:m.x,y:m.y,r:m.R,life:.35,max:.35,col:'#f97316'}); } }
   G.meteors = G.meteors.filter(m=>m.t>0);
-  for(const o of G.pools){ o.life-=dt; o.tick-=dt; if(o.tick<=0){ o.tick=.4; for(const e of G.en) if((e.x-o.x)**2+(e.y-o.y)**2<(o.R+e.r)**2) hurt(e,o.dmg); } }
+  for(const o of G.pools){ o.life-=dt; o.tick-=dt; if(o.tick<=0){ o.tick=.4; curSrc=o.src||""; for(const e of G.en) if((e.x-o.x)**2+(e.y-o.y)**2<(o.R+e.r)**2){ hurt(e,o.dmg); if(o.slow) e.slow=Math.max(e.slow,.5); } curSrc=""; } }
   G.pools = G.pools.filter(o=>o.life>0);
 
   // Gegner
   for(let i=0;i<G.en.length;i++){ const e=G.en[i]; if(e.dead) continue;
-    const dx=p.x-e.x, dy=p.y-e.y, d=Math.hypot(dx,dy)||1, sp=e.sp*(e.slow>0?.5:1);
-    e.x+=dx/d*sp*dt; e.y+=dy/d*sp*dt; e.flash-=dt; e.slow-=dt; e.frostCd=(e.frostCd||0)-dt;
+    const dx=p.x-e.x, dy=p.y-e.y, d=Math.hypot(dx,dy)||1, sp=e.sp*(e.slow>0?(FOES[e.type].boss?.8:.5):1);
+    if(!foeAI(e,dt,dx,dy,d)){ e.x+=dx/d*sp*dt; e.y+=dy/d*sp*dt; } e.flash-=dt; e.slow-=dt; e.frostCd=(e.frostCd||0)-dt;
+
     for(let k=1;k<=6;k++){ const o=G.en[(i+k)%G.en.length]; if(o===e) continue; const ox=e.x-o.x, oy=e.y-o.y, od=Math.hypot(ox,oy), m=e.r+o.r;
       if(od>0&&od<m){ const f=(m-od)/2/od; e.x+=ox*f; e.y+=oy*f; } }
     if(d < e.r+p.r){
       if(p.inv>0){}   // gerade geschützt
-      else if(p.w.schild && p.w.schild.layers>0){ p.w.schild.layers--; p.inv=.25; knock(e,p,80); G.fx.push({x:p.x,y:p.y,r:46,life:.25,max:.25,col:'#67e8f9'}); }
-      else { p.hp -= e.dmg*dt*(1-Math.min(.75, p.armor+lvlBonus('armor'))); p.hurtT=.12; tip('hurt'); }
-      if(p.thorns) hurt(e, p.thorns*dt); }
+      else if(p.w.schild && p.w.schild.layers>0){ p.w.schild.layers--; p.inv=.25; curSrc="schild"; const sd=wDmg(20+p.w.schild.lvl*8); for(const o of G.en) if((o.x-p.x)**2+(o.y-p.y)**2<(90*p.size)**2){ hurt(o,sd); knock(o,p,80); } curSrc=""; G.fx.push({x:p.x,y:p.y,r:46,life:.25,max:.25,col:'#67e8f9'}); }
+      else { const hd=e.dmg*dt*(1-Math.min(.75, p.armor+lvlBonus('armor'))); p.hp-=hd; p.hurtT=.12; G.hurtGlow=Math.min(1,G.hurtGlow+hd/12); G.lastHit=e.type; tip('hurt'); }
+      if(p.thorns){ curSrc="dornen"; hurt(e, p.thorns*dt); curSrc=""; } }
   }
   G.en = G.en.filter(e=>!e.dead);
+  for(const s of G.eshots){ s.x+=s.vx*dt; s.y+=s.vy*dt; s.life-=dt; if((s.x-p.x)**2+(s.y-p.y)**2<(s.r+p.r)**2){ s.life=0; hitPlayer(s.dmg, 'shot'); } }
+  G.eshots=G.eshots.filter(s=>s.life>0);
+  if(G.won){ G.winT-=dt; if(G.winT<=0) return gameOver(true); }
   if(p.hp<=0){
     if(p.revive>0){ p.revive--; p.hp=p.maxHp*.5; for(const e of G.en) if((e.x-p.x)**2+(e.y-p.y)**2<220*220) hurt(e, 9999);
       G.fx.push({x:p.x,y:p.y,r:220,life:.6,max:.6,col:'#fbbf24'}); toast('🪶 Phönixfeder – wiederbelebt!'); }
@@ -436,10 +558,11 @@ function update(dt){
   if(G.gems.length>400) G.gems.splice(0,G.gems.length-400);
 
   for(const f of G.fx) f.life-=dt; G.fx=G.fx.filter(f=>f.life>0);
+  for(const n of G.nums) n.t-=dt; G.nums=G.nums.filter(n=>n.t>0); G.hurtGlow=Math.max(0,G.hurtGlow-dt*1.5);
   for(const b of G.bolts) b.life-=dt; G.bolts=G.bolts.filter(b=>b.life>0);
   for(const s of G.slashes) s.life-=dt; G.slashes=G.slashes.filter(s=>s.life>0);
 
-  if(G.pending>0 && mode==='play') openQuiz();
+  if(G.pending>0 && mode==='play' && G.luT<=0) openQuiz();
 }
 // Kisten: es liegen immer ein paar in der Nähe; anlaufen + genug Gold = öffnen (erst Frage, dann Gegenstand)
 function updChests(dt){
@@ -448,10 +571,11 @@ function updChests(dt){
   while(G.chests.length<3){ const a=Math.random()*Math.PI*2, d=450+Math.random()*500; G.chests.push({x:p.x+Math.cos(a)*d, y:p.y+Math.sin(a)*d}); }
   const cost=chestCost(); if(G.gold>=cost) tip('chest');
   for(const c of G.chests){ if((c.x-p.x)**2+(c.y-p.y)**2 > 34*34) continue;
-    if(G.gold>=cost){ G.gold-=cost; G.opened++; G.chests.splice(G.chests.indexOf(c),1); G.chestMode=true; openQuiz(); return; }
+    if(c.free || G.gold>=cost){ if(!c.free){ G.gold-=cost; G.opened++; } G.chests.splice(G.chests.indexOf(c),1); G.chestMode=true; openQuiz(); return; }
     if(G.goldMsgT<=0){ toast(`📦 Kiste kostet ${cost} 🪙 – du hast ${G.gold}`); G.goldMsgT=2.5; } }
 }
-function gainXp(v){ v*=G.p.xpMul+lvlBonus('xp'); G.xp+=v; while(G.xp>=G.need){ G.xp-=G.need; G.level++; G.need=xpNeed(G.level); G.pending++; } }
+function gainXp(v){ v*=G.p.xpMul+lvlBonus('xp'); G.xp+=v; while(G.xp>=G.need){ G.xp-=G.need; G.level++; G.need=xpNeed(G.level); G.pending++;
+  if(G.luT<=0){ G.luT=.7; G.fx.push({x:G.p.x,y:G.p.y,r:120,life:.6,max:.6,col:'#fde047'}); } } }
 
 // ================= Zeichnen =================
 function hash(i,j){ let h=Math.imul(i,374761393)+Math.imul(j,668265263); h=Math.imul(h^(h>>>13),1274126177); return (h^(h>>>16))>>>0; }
@@ -475,13 +599,40 @@ function draw(){
   R3.render(G,W,H);
   const cost=chestCost(); cx.font='bold 14px system-ui'; cx.textAlign='center';
   for(const c of G.chests){ const s=R3.toScreen(c.x,c.y,48); if(!s.vis||s.x<-40||s.x>W+40||s.y<-20||s.y>H+20) continue;
-    const ok=G.gold>=cost; cx.fillStyle='#000a'; cx.fillRect(s.x-30,s.y-16,60,20); cx.fillStyle=ok?'#fde047':'#cbd5e1'; cx.fillText(`🪙 ${cost}`,s.x,s.y-1); }
-  for(const e of G.en) if(e.type==='lock'||e.type==='boss'){ const s=R3.toScreen(e.x,e.y,e.r*(e.type==='boss'?2.8:2)+12), w=e.type==='boss'?90:36;
+    const ok=c.free||G.gold>=cost; cx.fillStyle='#000a'; cx.fillRect(s.x-34,s.y-16,68,20); cx.fillStyle=ok?'#fde047':'#cbd5e1'; cx.fillText(c.free?'🎁 GRATIS':`🪙 ${cost}`,s.x,s.y-1); }
+  for(const e of G.en) if(e.type==='lock'||e.type==='over'){ const s=R3.toScreen(e.x,e.y,e.r*2+12), w=36;
     cx.fillStyle='#0008'; cx.fillRect(s.x-w/2,s.y,w,5); cx.fillStyle='#ef4444'; cx.fillRect(s.x-w/2,s.y,w*e.hp/e.max,5); }
-  miniMap(cost);
+  // Warnlinie: hier stürmt der Gegner gleich hin
+  for(const e of G.en) if(e.tele>0){ const a=R3.toScreen(e.x,e.y,4), b=R3.toScreen(e.tx+(e.tx-e.x)*.35,e.ty+(e.ty-e.y)*.35,4);
+    cx.save(); cx.strokeStyle=`rgba(239,68,68,${.45+.4*Math.sin(performance.now()/60)})`; cx.lineWidth=FOES[e.type].boss?e.r*.9:12; cx.lineCap='round'; cx.setLineDash([18,12]);
+    cx.beginPath(); cx.moveTo(a.x,a.y); cx.lineTo(b.x,b.y); cx.stroke(); cx.restore(); }
+  // Boss-Balken mit Namen oben in der Mitte
+  const bosses=G.en.filter(e=>FOES[e.type].boss);
+  bosses.forEach((e,i)=>{ const mob=W<700, bw=mob?W-120:Math.min(420,W-420), x=mob?16:Math.max(250,(W-bw)/2), y=mob?H-46-i*24:(document.querySelector('#hud .row')?.getBoundingClientRect().bottom||50)+10+i*24;
+    cx.fillStyle='#000b'; cx.fillRect(x-2,y-2,bw+4,18); cx.fillStyle=e.type==='tutor'?'#f59e0b':'#ef4444'; cx.fillRect(x,y,bw*Math.max(0,e.hp/e.max),14);
+    cx.fillStyle='#fff'; cx.font='800 12px system-ui'; cx.textAlign='center'; cx.fillText(`${e.type==='tutor'?'🎓':'🔁'} ${FOES[e.type].name}${e.hp<e.max*.5?' – wütend!':''}`,W/2,y+11); });
+  drawNums(); drawGlow(); miniMap(cost);
   if(joy){ cx.strokeStyle='#fff5'; cx.lineWidth=2; cx.beginPath(); cx.arc(joy.ox,joy.oy,45,0,7); cx.stroke(); cx.fillStyle='#fff5'; cx.beginPath();
     const dx=joy.x-joy.ox, dy=joy.y-joy.oy, l=Math.min(45,Math.hypot(dx,dy)), a=Math.atan2(dy,dx); cx.arc(joy.ox+Math.cos(a)*l,joy.oy+Math.sin(a)*l,18,0,7); cx.fill(); }
-  if(toastT>0){ cx.globalAlpha=Math.min(1,toastT); cx.fillStyle='#fde047'; cx.font='bold 22px system-ui'; cx.textAlign='center'; cx.fillText(toastMsg,W/2,110); cx.globalAlpha=1; }
+  if(toastT>0){ cx.globalAlpha=Math.min(1,toastT); cx.fillStyle='#fde047'; cx.textAlign='center'; let fs=22; cx.font=`bold ${fs}px system-ui`;
+    while(fs>12 && cx.measureText(toastMsg).width>W-24){ fs--; cx.font=`bold ${fs}px system-ui`; }   // passt sich der Bildschirmbreite an
+    const ty=W<700?H*.3:110; cx.lineWidth=4; cx.strokeStyle='#000a'; cx.strokeText(toastMsg,W/2,ty); cx.fillText(toastMsg,W/2,ty); cx.globalAlpha=1; }
+}
+// Schadenszahlen: steigen auf und verblassen; Krit groß und gelb
+function drawNums(){
+  cx.textAlign='center';
+  for(const n of G.nums){ const v=Math.round(n.v); if(v<1) continue; const s=R3.toScreen(n.x,n.y,n.h+(.8-n.t)*60); if(!s.vis) continue;
+    const big=n.crit||n.boss; cx.globalAlpha=Math.min(1,n.t*2.5); cx.font=`900 ${big?20:14}px system-ui`;
+    cx.lineWidth=3; cx.strokeStyle='#000c'; cx.strokeText(v,s.x,s.y); cx.fillStyle=n.crit?'#fde047':'#fff'; cx.fillText(v,s.x,s.y); }
+  cx.globalAlpha=1;
+}
+// roter Rand bei Schaden (pulsiert bei wenig Leben) und „LEVEL UP!“
+function drawGlow(){
+  const p=G.p, low=p.hp/p.maxHp<.3 ? .25+.2*Math.sin(performance.now()/180) : 0, a=Math.max(G.hurtGlow*.55, low);
+  if(a>0.01){ const g=cx.createRadialGradient(W/2,H/2,Math.min(W,H)*.35,W/2,H/2,Math.max(W,H)*.75);
+    g.addColorStop(0,'rgba(239,68,68,0)'); g.addColorStop(1,`rgba(239,68,68,${a})`); cx.fillStyle=g; cx.fillRect(0,0,W,H); }
+  if(G.luT>0){ const k=1-G.luT/.7; cx.save(); cx.globalAlpha=Math.min(1,G.luT*4); cx.textAlign='center'; cx.font=`900 ${Math.round(34+k*14)}px system-ui`;
+    cx.lineWidth=6; cx.strokeStyle='#3a2a00'; cx.strokeText('LEVEL UP!',W/2,H*.38); cx.fillStyle='#fde047'; cx.fillText('LEVEL UP!',W/2,H*.38); cx.restore(); }
 }
 // Minikarte oben rechts: du in der Mitte (Pfeil = Laufrichtung), Kisten (gelb = bezahlbar), Bosse (rot, am Rand, wenn weiter weg)
 const MINI_RANGE=1700;
@@ -504,7 +655,8 @@ let toastMsg='', toastT=0; function toast(m){ toastMsg=m; toastT=2.5; }
 function hud(){
   const p=G.p; $('xpbar').firstElementChild.style.width=(G.xp/G.need*100)+'%';
   $('hp').firstElementChild.style.width=Math.max(0,p.hp/p.maxHp*100)+'%';
-  $('lvl').textContent='Lv '+G.level; const s=Math.floor(G.t); $('time').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+  $('lvl').textContent='Lv '+G.level; const s=Math.floor(G.t); $('time').textContent=fmtT(s)+(G.tutorOn?'':' / 10:00');
+  $('dashBtn').classList.toggle('cd', (p.dashCd||0)>0);
   $('streak').textContent=(G.streak?'🔥'+G.streak+' ':'')+'🍀'+luckNow();
   $('gold').textContent='🪙 '+G.gold; $('pas').textContent=G.cls.icon+' '+G.cls.badge(G.level);
   const sk=Object.entries(p.w).map(([k,w])=>k+w.lvl).join()+'|'+Object.entries(p.books).map(([k,l])=>k+l).join()+'|'+Object.entries(p.items).map(([k,l])=>k+l).join(); if(sk!==hud.k){ hud.k=sk; $('weps').innerHTML=slotsHtml(); }
@@ -515,6 +667,7 @@ function luckNow(){ return G.p.luck + Math.min(12, Math.round(G.streak*1.5)); }
 function pickQuestion(){
   const F=choice.area.fragen, due=G.review.findIndex(r=>r.due<=G.level);
   if(due>=0){ const r=G.review.splice(due,1)[0]; return {f:r.f, again:true}; }
+  if(G.due && G.due.length){ const f=G.due.shift(); G.asked.add(f); return {f, again:true}; }
   let pool=F.filter(f=>f.d===G.diff && !G.asked.has(f));
   if(!pool.length){ F.filter(f=>f.d===G.diff).forEach(f=>G.asked.delete(f)); pool=F.filter(f=>f.d===G.diff); }
   if(!pool.length) pool=F;
@@ -526,20 +679,29 @@ let Q=null;
 function openQuiz(){
   mode='quiz'; joy=null; const {f,again}=pickQuestion();
   const opts=f.a.map((t,i)=>({t,ok:i===0})).sort(()=>Math.random()-.5);
-  Q={f, again, opts, t0:performance.now(), bonus:Math.max(5, 14 - G.t/45)*1000, done:false};
+  // Erst lesen: Antworten erscheinen nach einer Lesezeit (je nach Textlänge, Code länger) – erst dann läuft der Bonus-Balken
+  const code=f.q.includes('\n'), readMs=Math.min(8000, Math.max(1500, f.q.length*28 + (code?2500:0)));
+  Q={f, again, opts, reroll:!!G.rerollQ, t0:Infinity, read0:performance.now(), readMs, bonus:Math.max(8, 14 - G.t/60)*1000, done:false, shown:false};
+  G.rerollQ=false;
   $('qinfo').textContent=(G.chestMode?'📦 Kiste · ':'')+(again?'🔁 Wiederholung · ':'')+'Stufe '+'★'.repeat(f.d)+'☆'.repeat(3-f.d);
   $('qluck').textContent=(G.streak?'🔥 Streak '+G.streak+' · ':'')+'⚡ schnell = mehr Glück';
   $('qtext').innerHTML=fmt(f.q);
   $('qans').innerHTML=opts.map((o,i)=>`<button class="ans" data-i="${i}">${fmt(o.t)}</button>`).join('');
+  $('qans').classList.add('wait'); $('qRead').style.display='block'; $('bonus').classList.add('read');
+  $('box_q').classList.remove('win','lose');
   $('fb').style.display='none'; $('qNext').style.display='none';
   modalHint('qHint','quiz','⬆️ <b>Level-up!</b> Beantworte die Frage, danach wählst du eine Karte. <b>Richtig + schnell</b> (solange der gelbe Balken läuft) = mehr 🍀 Glück auf seltene Karten. Falsch = trotzdem eine Karte, aber ohne Glück.');
   show('ovQuiz');
 }
+function showAnswers(){ if(!Q||Q.shown) return; Q.shown=true; Q.t0=performance.now(); $('qans').classList.remove('wait'); $('qRead').style.display='none'; $('bonus').classList.remove('read'); }
+$('qRead').onclick=showAnswers;
 $('qans').addEventListener('click', e=>{
-  const b=e.target.closest('.ans'); if(!b||Q.done) return; Q.done=true;
+  const b=e.target.closest('.ans'); if(!b||Q.done||!Q.shown) return; Q.done=true;
   const o=Q.opts[+b.dataset.i], fast=performance.now()-Q.t0 < Q.bonus;
   [...$('qans').children].forEach((x,i)=>{ if(Q.opts[i].ok) x.classList.add('ok'); });
-  G.hist.push(o.ok); G.recent.push(o.ok);
+  G.hist.push(o.ok); G.recent.push(o.ok); G.lastOk=o.ok; G.lastReroll=Q.reroll; if(o.ok&&Q.reroll) G.rrOk++;
+  noteAnswer(Q.f, o.ok);
+  $('box_q').classList.add(o.ok?'win':'lose'); if(o.ok) fxBurst(b, fast);
   if(o.ok){ G.streak++; if(G.streak===2) tip('streak'); G.best=Math.max(G.best,G.streak); G.lastLuck=luckNow()+(fast?3:0); }
   else { b.classList.add('bad'); G.streak=0; G.lastLuck=G.p.luck; G.review.push({f:Q.f, due:G.level+3}); if(!G.wrongs.includes(Q.f)) G.wrongs.push(Q.f); }
   const r3=G.recent.slice(-3);
@@ -550,7 +712,16 @@ $('qans').addEventListener('click', e=>{
   if(!o.ok) setTimeout(()=>nb.disabled=false, 1500);
 });
 $('qNext').onclick=()=>openPick();
-$('pkReroll').onclick=()=>openQuiz();
+// Neu würfeln: nur nach richtiger Antwort und höchstens einmal je Auswahl; die Zusatzfrage zählt nicht für Punkte
+$('pkReroll').onclick=()=>{ G.rerollQ=true; openQuiz(); };
+// kleine Funken auf dem Antwortknopf
+function fxBurst(el, fast){
+  const r=el.getBoundingClientRect(), n=fast?18:10;
+  for(let i=0;i<n;i++){ const s=document.createElement('i'); s.className='spark'; s.textContent=['✦','★','✨','+'][i%4];
+    s.style.left=(r.left+r.width*Math.random())+'px'; s.style.top=(r.top+r.height/2)+'px';
+    s.style.setProperty('--dx',(Math.random()*160-80)+'px'); s.style.setProperty('--dy',(-40-Math.random()*90)+'px');
+    document.body.appendChild(s); setTimeout(()=>s.remove(),750); }
+}
 
 function rollRarity(L){ const w=[Math.max(8,62-5*L), 28+2*L, 8+2*L, 2+1.2*L], s=w.reduce((a,b)=>a+b); let r=Math.random()*s; for(let i=0;i<4;i++){ if((r-=w[i])<0) return i; } return 0; }
 // Plätze: je 4 Waffen und 4 Bücher; Anzeige im HUD und bei der Auswahl
@@ -590,27 +761,116 @@ function openPick(){
     else if(p.w[o.id]) p.w[o.id].lvl=Math.min(MAX_WEP_LVL, p.w[o.id].lvl+RAR[o.r].step); else { addWeapon(o.id); p.w[o.id].lvl=RAR[o.r].step; }
     if(G.chestMode) G.chestMode=false; else G.pending--;
     if(G.pending>0) openQuiz(); else resume(); };
+  $('pkReroll').style.display = (G.lastOk && !G.lastReroll) ? 'block' : 'none';
   show('ovPick');
 }
 
 // ================= Ablauf =================
 function show(id){ document.querySelectorAll('.ov').forEach(o=>o.classList.toggle('on',o.id===id)); }
-function resume(){ show(null); mode='play'; last=performance.now(); }
+function resume(){ show(null); const was=mode; mode='play'; last=performance.now();
+  // nach einer Frage/Auswahl: kurz geschützt und Gegner weggeschoben – sonst trifft man sofort
+  if(G && (was==='quiz'||was==='pick')){ const p=G.p; p.inv=Math.max(p.inv||0, 1.2); for(const e of G.en) if((e.x-p.x)**2+(e.y-p.y)**2<140*140) knock(e,p,90);
+    G.fx.push({x:p.x,y:p.y,r:140,life:.35,max:.35,col:'#7dd3fc'}); } }
 function pause(){ mode='pause'; const a=G.hist.filter(Boolean).length;
   $('pauseInfo').innerHTML=`<p>Fragen: ${a} von ${G.hist.length} richtig · bester Streak ${G.best} · Schwierigkeit ${'★'.repeat(G.diff)}</p>`; show('ovPause'); }
-function gameOver(){
+const FOE_NAME = t => t==='shot' ? 'einer Kugel' : (FOES[t]||{}).name || 'einem Gegner';
+function gameOver(win){
   mode='over'; document.body.classList.remove('playing');
   if(G.tips){ store.set('ls_tips', false); $('tipsChk').checked=false; }   // Tipps nur beim ersten Spiel, per Häkchen wieder an
-  const a=G.hist.filter(Boolean).length, s=Math.floor(G.t);
-  const entry={id:Date.now(), name:G.name, cls:G.cls.icon, area:choice.area.id, pts:a*100+s+G.best*20, ok:a, q:G.hist.length, t:s, lvl:G.level};
+  const ok=G.hist.filter(Boolean).length, a=ok-G.rrOk, s=Math.floor(G.t), bonus=win?1000:0;
+  prog.runs++; if(win) prog.wins++; saveProg(); checkUnlocks();
+  const entry={id:Date.now(), name:G.name, cls:G.cls.icon, area:choice.area.id, pts:a*100+s+G.best*20+bonus, ok, q:G.hist.length, t:s, lvl:G.level, win:!!win};
   const all=store.get('ls_scores',[]); all.push(entry); all.sort((x,y)=>y.pts-x.pts); store.set('ls_scores', all.slice(0,300));
   const rank=all.filter(x=>x.area===entry.area).indexOf(entry)+1;
+  $('overTitle').textContent = win ? '🎓 Bestanden!' : 'Vorbei';
   $('overPts').innerHTML=`${esc(G.name)}: ${entry.pts} Punkte`+(rank===1?' – 🥇 neuer Rekord!':rank<=10?` – Platz ${rank}`:'');
+  $('overBreak').innerHTML=`${a} richtig × 100 = ${a*100} · ${s} s = ${s} · bester Streak ${G.best} × 20 = ${G.best*20}`+(win?' · 🎓 Tutor besiegt +1000':'')+
+    (G.rrOk?` · (${G.rrOk} Zusatzfrage${G.rrOk>1?'n':''} beim Neu-Würfeln zählt nicht)`:'')+
+    (win?'':`<br>Erwischt von ${FOE_NAME(G.lastHit)} bei ${fmtT(s)}.`+(G.t<600?` Noch ${fmtT(600-s)} bis zum Tutor.`:''))+
+    (G.newPages?`<br>📓 ${G.newPages} neue Hefterseite${G.newPages>1?'n':''} freigeschaltet!`:'');
   $('overBoard').innerHTML=boardHtml(entry.area, entry.id); renderBoard();
-  $('overStats').innerHTML=`<div>⏱ ${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}</div><div>⬆️ Level ${G.level}</div><div>💥 ${G.kills} besiegt</div><div>✔ ${a}/${G.hist.length} richtig</div><div>🔥 bester Streak ${G.best}</div><div>★ erreicht ${'★'.repeat(G.diff)}</div>`;
+  $('overStats').innerHTML=`<div>⏱ ${fmtT(s)}</div><div>⬆️ Level ${G.level}</div><div>💥 ${G.kills} besiegt</div><div>✔ ${ok}/${G.hist.length} richtig</div><div>🔥 bester Streak ${G.best}</div><div>★ erreicht ${'★'.repeat(G.diff)}</div>`;
+  const D=Object.entries(G.dmgBy).filter(([k])=>WEAPONS[k]||k==='dornen').sort((x,y)=>y[1]-x[1]), mx=D.length?D[0][1]:1;
+  $('overDmg').innerHTML=D.map(([k,v])=>{ const W_=WEAPONS[k]||{icon:'🌵',name:'Dornenmantel'}; return `<div class="dmgrow"><b>${W_.icon} ${W_.name}</b><i style="width:${Math.max(3,v/mx*100)}%"></i><span>${Math.round(v).toLocaleString('de-DE')}</span></div>`; }).join('')||'<p class="hint">–</p>';
   $('overWrong').innerHTML=G.wrongs.length?G.wrongs.map(f=>`<div class="wrong"><b>${fmt(f.q)}</b><br>✔ ${fmt(f.a[0])}<br><span style="color:var(--mut)">${fmt(f.e)}</span></div>`).join(''):'<p>Nichts – alles richtig! 🎉</p>';
+  retryInit();
   show('ovOver');
 }
+// Nach dem Spiel: falsche Fragen noch einmal selbst beantworten (Abrufen statt nur Lesen); jede richtige = +5 Startgold für die nächste Runde
+let RT=null;
+function retryInit(){
+  RT = G.wrongs.length ? {list:[...G.wrongs].sort(()=>Math.random()-.5), i:0, ok:0} : null;
+  $('overRetry').innerHTML = RT ? `<button class="btn" id="retryGo" style="background:#1e3a5f;color:var(--ink);font-size:15px">🔁 Fehler jetzt nochmal beantworten – jede richtige: +5 🪙 Startgold</button>` : '';
+  $('overWrong').style.display='';
+  if(RT) $('retryGo').onclick=()=>{ $('overWrong').style.display='none'; retryShow(); };
+}
+function retryShow(){
+  if(RT.i>=RT.list.length){ $('overRetry').innerHTML=`<p><b>${RT.ok} von ${RT.list.length} richtig.</b> ${RT.ok?`Nächste Runde startest du mit ${prog.startGold} 🪙.`:''}</p>`; $('overWrong').style.display=''; return; }
+  const f=RT.list[RT.i], opts=f.a.map((t,i)=>({t,ok:i===0})).sort(()=>Math.random()-.5);
+  $('overRetry').innerHTML=`<div class="retry"><p class="hint">Frage ${RT.i+1} von ${RT.list.length}</p><div style="font-weight:700;margin:4px 0 8px">${fmt(f.q)}</div>`+
+    opts.map((o,i)=>`<button class="ans" data-i="${i}">${fmt(o.t)}</button>`).join('')+`<div id="rtFb"></div></div>`;
+  $('overRetry').querySelectorAll('.ans').forEach(b=>b.onclick=()=>{
+    if(RT.done) return; RT.done=true; const o=opts[+b.dataset.i];
+    $('overRetry').querySelectorAll('.ans').forEach((x,i)=>{ if(opts[i].ok) x.classList.add('ok'); }); if(!o.ok) b.classList.add('bad');
+    if(o.ok){ RT.ok++; prog.startGold=Math.min(40,(prog.startGold||0)+5); delete areaProg(choice.area.id).box[qKey(f)]; saveProg(); }
+    $('rtFb').innerHTML=`<div style="margin:8px 0">${o.ok?'✔ Richtig!':'✘ Noch nicht – sie kommt nächste Runde wieder.'} ${fmt(f.e)}</div><button class="btn" id="rtNext">Weiter</button>`;
+    $('rtNext').onclick=()=>{ RT.i++; RT.done=false; retryShow(); };
+  });
+}
+
+// ================= Fortschritt über Runden (nur dieses Gerät) =================
+const store={ get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+              set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
+const prog = (()=>{ const old=store.get('ls_prog',null), P=Object.assign({areas:{}, runs:0, wins:0, bestStreak:0, totalOk:0, startGold:0, cls:{}}, old||{});
+  if(!old && store.get('ls_scores',[]).length) CLASSES.forEach(c=>P.cls[c.id]=true);   // wer schon gespielt hat, behält alle Klassen
+  return P; })();
+const saveProg = () => store.set('ls_prog', prog);
+const qKey = f => { let h=7; for(const c of f.q) h=(h*31+c.charCodeAt(0))|0; return (h>>>0).toString(36); };
+function areaProg(id){ return prog.areas[id] || (prog.areas[id]={ok:0, seen:{}, box:{}}); }
+const heftOf = id => (window.HEFT||{})[id] || [];
+const pagesOpen = id => Math.min(heftOf(id).length, 1 + Math.floor(areaProg(id).ok/3));
+function noteAnswer(f, ok){
+  const id=choice.area.id, A=areaProg(id), k=qKey(f), before=pagesOpen(id);
+  if(ok){ A.ok++; prog.totalOk++; A.seen[k]=1; delete A.box[k]; } else A.box[k]=prog.runs+1;   // falsch: kommt nächste Runde wieder
+  prog.bestStreak=Math.max(prog.bestStreak, ok?G.streak+1:0);
+  const after=pagesOpen(id); if(after>before){ G.newPages=(G.newPages||0)+1; toast(`📓 Neue Hefterseite: ${heftOf(id)[after-1].t}`); }
+  saveProg(); checkUnlocks();
+}
+// Klassen werden über Lernziele freigeschaltet (Zauberer ist immer offen)
+const UNLOCK = {
+  jaeger:    {txt:'ab 20 richtigen Antworten insgesamt', ok:()=>prog.totalOk>=20},
+  alchemist: {txt:'ab einem Streak von 8 richtigen Antworten', ok:()=>prog.bestStreak>=8},
+  ritter:    {txt:'ab 15 richtigen Antworten in einem Lernbereich', ok:()=>Object.values(prog.areas).some(a=>a.ok>=15)},
+  gelehrter: {txt:'nach einem Sieg über den Tutor', ok:()=>prog.wins>=1},
+};
+const clsOpen = c => !UNLOCK[c.id] || prog.cls[c.id];
+function checkUnlocks(){
+  let neu=false; for(const c of CLASSES){ const u=UNLOCK[c.id]; if(u && !prog.cls[c.id] && u.ok()){ prog.cls[c.id]=true; neu=true; if(G) toast(`🔓 Neue Klasse frei: ${c.icon} ${c.name}`); } }
+  if(neu){ saveProg(); refreshClasses(); }
+}
+function refreshClasses(){
+  CLASSES.forEach(c=>{ c.off=!clsOpen(c); c.desc=c.off?`🔒 Frei ${UNLOCK[c.id].txt}.`:`Start: ${WEAPONS[c.weapon].icon} ${WEAPONS[c.weapon].name}. ${c.pas}`; });
+  if(!clsOpen(choice.cls)) choice.cls=CLASSES[0];
+  if($('selClass').innerHTML) selList($('selClass'),CLASSES,'cls');
+}
+// Hefter: Merke + Beispiel, Seiten werden mit richtigen Antworten frei
+let heftFrom='ovStart';
+function openHeft(from){ heftFrom=from;
+  $('heftArea').innerHTML=LERNBEREICHE.map(a=>`<option value="${a.id}">${a.icon} ${a.name} – ${pagesOpen(a.id)}/${heftOf(a.id).length} Seiten</option>`).join('');
+  $('heftArea').value=choice.area.id; renderHeft(); show('ovHeft'); }
+function renderHeft(){
+  const id=$('heftArea').value, A=areaProg(id), H=heftOf(id), n=pagesOpen(id), area=LERNBEREICHE.find(a=>a.id===id);
+  $('heftStats').innerHTML=`✔ ${A.ok} richtig · 🔍 ${Object.keys(A.seen).length}/${area.fragen.length} Fragen entdeckt · 📓 ${n}/${H.length} Seiten · 🔁 ${Object.keys(A.box).length} zum Wiederholen`;
+  $('heftPages').innerHTML=H.map((pg,i)=> i<n
+    ? `<div class="page"><h3>${i+1}. ${esc(pg.t)}</h3><p>💡 ${fmt(pg.merke).replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>")}</p>${pg.code?`<pre class="code">${esc(pg.bsp)}</pre>`:`<p style="color:var(--mut)">Beispiel: ${fmt(pg.bsp)}</p>`}</div>`
+    : `<div class="page lock"><h3>🔒 ${i+1}. ${esc(pg.t)}</h3><p>noch ${i*3-A.ok} richtige Antwort${i*3-A.ok>1?'en':''} in diesem Bereich</p></div>`).join('') || '<p class="hint">Für diesen Bereich gibt es noch keinen Hefter.</p>';
+}
+$('heftArea').onchange=renderHeft;
+$('heftClose').onclick=()=>{ show(heftFrom); if(heftFrom==='ovStart') updHeftInfo(); };
+$('heftBtn').onclick=()=>openHeft('ovStart');
+$('pauseHeft').onclick=()=>openHeft('ovPause');
+function updHeftInfo(){ const id=choice.area.id; $('heftInfo').textContent=`· ${choice.area.icon} ${pagesOpen(id)}/${heftOf(id).length} Seiten`; }
+
 function start(){
   const name=$('nick').value.trim();
   if(!name){ $('nick').classList.add('need'); $('nick').placeholder='Bitte erst einen Spitznamen eingeben'; show('ovStart'); $('nick').focus(); return; }
@@ -618,13 +878,11 @@ function start(){
   G.tips=$('tipsChk').checked; G.tipSeen=new Set(); tipQ=[]; tipT=0; $('tip').classList.remove('on'); tip('move'); document.body.classList.add('playing'); toastT=0; resume();
 }
 // Bestenliste: nur in diesem Browser (localStorage), pro Lernbereich
-const store={ get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
-              set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
 const fmtT = s => Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
 function boardHtml(area, mark){
   const L=store.get('ls_scores',[]).filter(s=>s.area===area).sort((a,b)=>b.pts-a.pts).slice(0,10);
   if(!L.length) return '<p class="hint">Noch keine Einträge – sei die oder der Erste!</p>';
-  return '<table class="board">'+L.map((s,i)=>`<tr class="${s.id===mark?'me':''}"><td>${['🥇','🥈','🥉'][i]||(i+1)+'.'}</td><td>${s.cls||''} ${esc(s.name)}</td><td>${s.pts}</td><td>${s.ok}/${s.q} ✔ · ${fmtT(s.t)}</td></tr>`).join('')+'</table>';
+  return '<table class="board">'+L.map((s,i)=>`<tr class="${s.id===mark?'me':''}"><td>${['🥇','🥈','🥉'][i]||(i+1)+'.'}</td><td>${s.cls||''} ${esc(s.name)}${s.win?' 🎓':''}</td><td>${s.pts}</td><td>${s.ok}/${s.q} ✔ · ${fmtT(s.t)}</td></tr>`).join('')+'</table>';
 }
 function renderBoard(){ $('board').innerHTML=boardHtml(choice.area.id); }
 
@@ -634,7 +892,8 @@ const TIPS = {
   gem:   '💎 Besiegte Gegner lassen <b>Kristalle</b> fallen. Lauf hin und sammle sie ein – das gibt Erfahrung (Leiste oben). Leiste voll = <b>Level-up</b>.',
   hurt:  '❤️ Gegner verletzen dich bei <b>Berührung</b> – weich ihnen aus! Dein Leben siehst du oben am roten Balken.',
   streak:'🔥 <b>Streak!</b> Mehrere richtige Antworten hintereinander geben immer mehr 🍀 Glück auf seltene Karten.',
-  boss:  '⚠️ Ein <b>Boss</b> kommt: viel Leben, viel Schaden. Auf Abstand bleiben – er lässt einen grünen Heilkristall fallen.',
+  boss:  '⚠️ Ein <b>Boss</b> kommt! Achte auf die <b>rote Linie</b> – dort stürmt er gleich hin – und weiche den Kugelringen aus. Besiegt lässt er eine <b>Gratis-Kiste</b> und einen Heilkristall fallen.',
+  tutor: '🎓 <b>Der Tutor</b> ist die Abschlussprüfung. Besiegst du ihn, hast du die Runde <b>bestanden</b>!',
   chest: '📦 Du hast genug 🪙 Gold für eine <b>Kiste</b>! Lauf zu einer braunen Kiste: Erst kommt eine Frage, dann wählst du einen <b>Gegenstand</b> (4 Plätze, je bis Stufe 3).',
   more:  '⚔️ Tipp: Bis zu <b>4 Waffen</b> gleichzeitig. Eine neue Waffe bringt meist mehr als ein kleines Buch.',
 };
@@ -654,12 +913,14 @@ $('nick').addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter
 
 function selList(el, list, key){
   el.innerHTML=list.map((c,i)=>`<button class="card ${c.off?'off':''} ${choice[key]===c?'sel':''}" data-i="${i}"><div class="big">${c.icon}</div><b>${c.name}</b><small>${c.desc||c.stufe||''}</small></button>`).join('');
-  el.onclick=e=>{ const b=e.target.closest('.card'); if(!b) return; const c=list[+b.dataset.i]; if(c.off) return; choice[key]=c; selList(el,list,key); if(key==='area') renderBoard(); };
+  el.onclick=e=>{ const b=e.target.closest('.card'); if(!b) return; const c=list[+b.dataset.i]; if(c.off) return; choice[key]=c; selList(el,list,key); if(key==='area'){ renderBoard(); updHeftInfo(); } };
 }
-selList($('selClass'),CLASSES,'cls'); selList($('selMap'),MAPS,'map');
+refreshClasses(); selList($('selClass'),CLASSES,'cls'); selList($('selMap'),MAPS,'map');
 LERNBEREICHE.forEach(a=>a.desc=a.stufe+' · '+a.fragen.length+' Fragen');
-selList($('selArea'),LERNBEREICHE,'area'); renderBoard();
+selList($('selArea'),LERNBEREICHE,'area'); renderBoard(); updHeftInfo();
 $('startBtn').onclick=start; $('againBtn').onclick=start;
+$('menuBtn').onclick=()=>{ G=null; mode='menu'; renderBoard(); updHeftInfo(); show('ovStart'); };
+$('quitBtn').onclick=()=>{ if(G) gameOver(false); };
 $('pauseBtn').onclick=()=>{ if(mode==='play') pause(); }; $('resumeBtn').onclick=resume;
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&mode==='play') pause(); });
 
@@ -668,7 +929,8 @@ function frame(now){
   const dt=Math.min(.05,(now-last)/1000); last=now;
   if(!G) demoTick(dt);
   if(mode==='play'){ update(dt); toastT-=dt; tipTick(dt); } else $('tip').classList.remove('on');
-  if(mode==='quiz'&&Q&&!Q.done){ const r=1-(now-Q.t0)/Q.bonus; $('bonus').firstElementChild.style.width=Math.max(0,r*100)+'%'; }
+  if(mode==='quiz'&&Q&&!Q.done){ if(!Q.shown){ const r=(now-Q.read0)/Q.readMs; $('bonus').firstElementChild.style.width=Math.min(100,r*100)+'%'; if(r>=1) showAnswers(); }
+    else { const r=1-(now-Q.t0)/Q.bonus; $('bonus').firstElementChild.style.width=Math.max(0,r*100)+'%'; } }
   draw(); if(G) hud();
   requestAnimationFrame(frame);
 }

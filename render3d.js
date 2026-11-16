@@ -65,6 +65,12 @@ const R3 = (() => {
     inst('glitch', new THREE.OctahedronGeometry(1, 0), lam('#fff', {emissive: '#3b0764'}), 350);
     inst('lock', new THREE.BoxGeometry(1, 1, 1), lam('#fff'), 200);
     inst('boss', new THREE.TorusKnotGeometry(1, .32, 48, 8), lam('#fff', {emissive: '#450a0a'}), 6);
+    inst('spam', new THREE.ConeGeometry(1, 1.6, 6), lam('#fff', {emissive: '#422006'}), 80);      // Fernkämpfer
+    inst('fork', new THREE.DodecahedronGeometry(1, 0), lam('#fff'), 200);                        // teilt sich
+    inst('over', new THREE.CylinderGeometry(1, 1, 1, 8), lam('#fff', {emissive: '#431407'}), 80);  // stürmt los
+    inst('tutor', new THREE.IcosahedronGeometry(1, 0), lam('#fff', {emissive: '#422006'}), 2);
+    inst('cap', new THREE.BoxGeometry(1, .18, 1), lam('#111827'), 2);                            // Doktorhut des Tutors
+    inst('eshot', new THREE.SphereGeometry(1, 8, 6), basic('#fff'), 300);                         // gegnerische Geschosse
     inst('eye', new THREE.SphereGeometry(1, 6, 4), basic('#111'), 700);
 
     // Waffen & Effekte
@@ -106,7 +112,7 @@ const R3 = (() => {
     for (const k in n) done(I[k], n[k]);
   }
 
-  const FOE_COL = {bug: '#ef4444', glitch: '#e879f9', lock: '#94a3b8', boss: '#dc2626'};
+  const FOE_COL = {bug: '#ef4444', glitch: '#e879f9', lock: '#94a3b8', boss: '#dc2626', spam: '#facc15', fork: '#4ade80', over: '#fb923c', tutor: '#f59e0b'};
   function render(G, W, H) {
     if (W !== lastW || H !== lastH) { ren.setSize(W, H, false); cam.aspect = W / H; cam.updateProjectionMatrix(); lastW = W; lastH = H; }
     const p = G.p, t = G.t;
@@ -121,7 +127,7 @@ const R3 = (() => {
     let sh = 0; put(I.shadow, sh++, p.x, .5, p.y, 16);
 
     // Gegner
-    const n = {bug: 0, glitch: 0, lock: 0, boss: 0}; let ne = 0;
+    const n = {bug: 0, glitch: 0, lock: 0, boss: 0, spam: 0, fork: 0, over: 0, tutor: 0}; let ne = 0, ncap = 0;
     for (const e of G.en) {
       const m = I[e.type], i = n[e.type]++, r = e.r, ry = Math.atan2(p.x - e.x, p.y - e.y);
       let y = r, sx = r, sy = r, sz = r;
@@ -129,15 +135,21 @@ const R3 = (() => {
       if (e.type === 'glitch') { y = r * 1.6 + Math.sin(t * 6 + e.y) * 3; }
       if (e.type === 'lock') { sx = sz = r * 1.6; sy = r * 1.6; y = r * .8; }
       if (e.type === 'boss') { y = r * 1.3; }
-      put(m, i, e.x, y, e.y, sx, sy, sz, e.type === 'glitch' || e.type === 'boss' ? t * 2 + e.x : ry);
-      col(m, i, e.flash > 0 ? '#ffffff' : e.slow > 0 ? '#7dd3fc' : FOE_COL[e.type]);
+      if (e.type === 'spam') { sy = r * 1.4; y = r * 1.1; }
+      if (e.type === 'over') { sy = r * 1.5; y = r * .75 + (e.dash > 0 ? 6 : 0); }
+      if (e.type === 'fork') { y = r + Math.abs(Math.sin(t * 10 + e.x)) * 2; }
+      if (e.type === 'tutor') { y = r * 1.25 + Math.sin(t * 2) * 4; put(I.cap, ncap++, e.x, y + r * 1.05, e.y, r * 1.5, r * 1.5, r * 1.5, t * .7); }
+      put(m, i, e.x, y, e.y, sx, sy, sz, e.type === 'glitch' || e.type === 'boss' ? t * 2 + e.x : e.type === 'tutor' ? t * .7 : ry);
+      const big = e.type === 'boss' || e.type === 'tutor';   // Bosse nur leicht aufhellen, sonst blinken sie dauerhaft weiß
+      col(m, i, e.flash > 0 ? (big ? (e.type === 'tutor' ? '#fde68a' : '#f87171') : '#ffffff') : e.slow > 0 && !big ? '#7dd3fc' : e.dash > 0 ? '#fde047' : FOE_COL[e.type]);
       put(I.shadow, sh++, e.x, .5, e.y, r * 1.1);
-      if (e.type !== 'boss') for (const s of [-1, 1]) {   // Augen Richtung Zauberer
+      if (e.type !== 'boss' && e.type !== 'spam') for (const s of [-1, 1]) {   // Augen Richtung Zauberer
         const ex = e.x + Math.sin(ry) * r * .9 + Math.cos(ry) * s * r * .35, ez = e.y + Math.cos(ry) * r * .9 - Math.sin(ry) * s * r * .35;
         put(I.eye, ne++, ex, y + r * .25, ez, Math.max(1.6, r * .16));
       }
     }
-    for (const k in n) done(I[k], n[k]); done(I.eye, ne);
+    for (const k in n) done(I[k], n[k]); done(I.eye, ne); done(I.cap, ncap);
+    let neb = 0; for (const s of (G.eshots || [])) { put(I.eshot, neb, s.x, 16, s.y, s.r); col(I.eshot, neb++, s.col || '#f43f5e'); } done(I.eshot, neb);
 
     // Geschosse
     let nf = 0, na = 0, nb = 0;
