@@ -2,7 +2,7 @@
 
 Ein kleines Survivor-Spiel für den Informatikunterricht: Gegnerwellen überleben, Kristalle sammeln – und **bei jedem Level-up eine Frage beantworten**. Richtige und schnelle Antworten sowie Streaks bringen 🍀 Glück auf seltene Karten. Falsch beantwortete Fragen kommen später wieder.
 
-**Spielen:** einfach die GitHub-Pages-Seite öffnen – läuft im Browser auf PC, Tablet und Handy, ohne Anmeldung.
+**Spielen:** [lern-survivor.de](https://lern-survivor.de) öffnen – läuft im Browser auf PC, Tablet und Handy, ohne Anmeldung.
 
 ## Lernbereiche
 
