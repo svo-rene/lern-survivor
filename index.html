@@ -33,6 +33,10 @@ h1{margin:0 0 4px;font-size:28px} h2{margin:14px 0 8px;font-size:15px;color:var(
 p{margin:6px 0;line-height:1.4}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .card{background:#0e1914;border:2px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;color:var(--ink);text-align:left;font:inherit}
+.card{position:relative} .card .bn{position:absolute;top:4px;right:4px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;border-radius:8px;background:#0008;opacity:.75} .card .bn:hover{opacity:1;background:#7f1d1d}
+.kn{display:inline-block;min-width:20px;margin-right:6px;color:var(--mut);font-weight:700}
+.lbar{display:flex;height:16px;border-radius:8px;overflow:hidden;background:#1f2937;margin:6px 0} .lbar i{display:block} .lbar .g{background:#22c55e} .lbar .w{background:#f59e0b} .lbar .n{background:#475569}
+.llg{font-size:13px;color:var(--mut)} .llg b{color:var(--ink)}
 .card.sel{border-color:var(--acc)} .card.off{opacity:.4;cursor:default}
 .card b{display:block;font-size:16px} .card small{color:var(--mut);display:block;margin-top:3px;line-height:1.3}
 .big{font-size:30px}
@@ -71,7 +75,9 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
 .dmgrow{display:flex;align-items:center;gap:8px;font-size:14px;margin:3px 0} .dmgrow b{flex:0 0 130px;font-weight:600}
 .dmgrow i{display:block;height:10px;border-radius:5px;background:linear-gradient(90deg,#f59e0b,#ef4444)} .dmgrow span{color:var(--mut);font-size:12px}
 .retry .ans{font-size:15px;padding:9px}
+@media (prefers-reduced-motion:reduce){ #box_q.win,#box_q.lose,.spark{animation:none!important} }
 @media (max-width:600px){
+  .ans{min-height:48px}
   #pas{display:none} #hp{width:80px} .row{gap:9px;font-size:14px}
   .slot{width:25px;height:25px;font-size:14px;border-radius:6px} .slot i{font-size:10px;line-height:13px;padding:0 3px}
   .sl-l{width:16px;font-size:12px} .sl-f{font-size:10px}
@@ -173,6 +179,7 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
   <div id="overBreak" class="hint" style="margin-top:8px"></div>
   <h2>⚔️ Schaden je Waffe</h2><div id="overDmg"></div>
   <h2>🏆 Bestenliste</h2><div id="overBoard"></div>
+  <h2>📊 Dein Lernstand in diesem Bereich</h2><div id="overLearn"></div>
   <h2>Das solltest du wiederholen</h2><div id="overRetry"></div><div id="overWrong"></div>
   <button class="btn" id="againBtn">↻ Nochmal</button>
   <button class="btn" id="menuBtn" style="background:#334155;color:var(--ink);font-size:15px">🏠 Zum Menü</button>
@@ -281,7 +288,7 @@ const FOES = {
 const $ = id => document.getElementById(id);
 const cv = $('c'), cx = cv.getContext('2d');
 let W=0, H=0;
-function resize(){ const d=devicePixelRatio||1; W=innerWidth; H=innerHeight; cv.width=W*d; cv.height=H*d; cx.setTransform(d,0,0,d,0,0); }
+function resize(){ const d=Math.min(devicePixelRatio||1, 2); W=innerWidth; H=innerHeight; cv.width=W*d; cv.height=H*d; cx.setTransform(d,0,0,d,0,0); }
 addEventListener('resize', resize); resize();
 
 const choice = {cls:CLASSES[0], area:LERNBEREICHE[0]};
@@ -291,7 +298,7 @@ function newGame(){
   const p = {x:0,y:0,r:14,hp:120,maxHp:120,regen:.5,speed:170,magnet:95,dmg:1,rate:1,count:0,size:1,crit:.05,luck:0,armor:0,
     w:{}, books:{}, items:{}, goldMul:1, xpMul:1, revive:0, lifesteal:0, thorns:0, castN:0, face:1, dx:1, dy:0, hurtT:0};
   G = {p, t:0, en:[], shots:[], slashes:[], meteors:[], pools:[], gold:0, chests:[], opened:0, chestMode:false, goldMsgT:0, fx:[], gems:[], bolts:[], level:1, xp:0, need:xpNeed(1), pending:0, kills:0,
-       spawnAcc:0, world:0, wt:0, bossOn:false, nextWorldT:0, streak:0, best:0, diff:1, recent:[], asked:new Set(), review:[], hist:[], wrongs:[], lastLuck:0, rrOk:0, lastOk:false, lastReroll:false, rerollQ:false, nums:[], dmgBy:{}, hurtGlow:0, luT:0, lastHit:'', eshots:[], won:false, winT:0};
+       spawnAcc:0, world:0, wt:0, bossOn:false, nextWorldT:0, streak:0, best:0, diff:1, recent:[], asked:new Set(), review:[], hist:[], wrongs:[], lastLuck:0, rrOk:0, lastOk:false, lastReroll:false, rerollQ:false, nums:[], dmgBy:{}, hurtGlow:0, luT:0, lastHit:'', eshots:[], won:false, winT:0, banish:2, banned:new Set()};
   const C=choice.cls; G.cls=C; p.maxHp=p.hp=C.hp; p.speed*=C.spd; R3.setLook(C.robe, C.hat);
   addWeapon(C.weapon); R3.setWorld(0);
   G.gold=prog.startGold||0; prog.startGold=0; saveProg();
@@ -470,7 +477,7 @@ function nextWorld(){
   const p=G.p; G.world++; G.wt=0; G.bossOn=false; G.warned=false;
   for(const e of G.en) G.fx.push({x:e.x,y:e.y,r:e.r*2,life:.3,max:.3,col:'#fff'});
   G.en=[]; G.eshots=[]; G.gems.forEach(g=>g.pull=true);
-  p.hp=Math.min(p.maxHp, p.hp+p.maxHp*.5); p.inv=2;
+  p.hp=Math.min(p.maxHp, p.hp+p.maxHp*.5); p.inv=2; G.banish++;
   R3.setWorld(G.world); const w=WORLDS[G.world]; toast(`${w.icon} Welt ${G.world+1}: ${w.name}`);
 }
 // Anfang sanft (linearer Teil), danach steigt es schnell (Potenz-Teil)
@@ -480,12 +487,15 @@ const spawnRate = () => Math.min(34, 0.7 + G.t/DIFF.spawn + (G.t/DIFF.spawn2)**2
 
 // ================= Update =================
 const keys = {}; let joy = null;
-addEventListener('keydown', e=>{ keys[e.key.toLowerCase()]=true; if((e.key==='Escape'||e.key==='p')&&mode==='play') pause(); if((e.key===' '||e.key==='Shift')&&mode==='play'){ e.preventDefault(); dash(); } });
+addEventListener('keydown', e=>{
+  if(mode==='quiz'&&Q){ if(!Q.shown){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); showAnswers(); } } else if(!Q.done){ const i='1234'.indexOf(e.key); if(i>=0){ const b=$('qans').children[i]; if(b) b.click(); } } else if((e.key==='Enter'||e.key===' ')&&!$('qNext').disabled){ e.preventDefault(); $('qNext').click(); } return; }
+  if(mode==='pick'){ const i='123'.indexOf(e.key); if(i>=0){ const c=$('pkCards').children[i]; if(c) c.click(); } return; }
+  keys[e.key.toLowerCase()]=true; if((e.key==='Escape'||e.key==='p')&&mode==='play') pause(); if((e.key===' '||e.key==='Shift')&&mode==='play'){ e.preventDefault(); dash(); } });
 $('dashBtn').addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); dash(); });
 // Ausweichen: kurzer Sprint in Laufrichtung, dabei unverwundbar
 function dash(){ if(mode!=='play'||!G) return; const p=G.p; if((p.dashCd||0)>0) return; p.dashCd=2.2; p.dashT=.22; p.inv=Math.max(p.inv||0,.4); G.fx.push({x:p.x,y:p.y,r:40,life:.3,max:.3,col:'#e0f2fe'}); }
 addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
-cv.addEventListener('pointerdown', e=>{ if(mode==='play') joy={ox:e.clientX,oy:e.clientY,x:e.clientX,y:e.clientY,id:e.pointerId}; });
+cv.addEventListener('pointerdown', e=>{ const db=$('dashBtn').getBoundingClientRect(); if(mode==='play' && Math.hypot(e.clientX-(db.left+db.width/2), e.clientY-(db.top+db.height/2))>db.width*.5+34) joy={ox:e.clientX,oy:e.clientY,x:e.clientX,y:e.clientY,id:e.pointerId}; });
 addEventListener('pointermove', e=>{ if(joy&&e.pointerId===joy.id){joy.x=e.clientX;joy.y=e.clientY;} });
 addEventListener('pointerup', e=>{ if(joy&&e.pointerId===joy.id) joy=null; });
 addEventListener('pointercancel', ()=>joy=null);
@@ -691,7 +701,7 @@ function openQuiz(){
   $('qinfo').textContent=(G.chestMode?'📦 Kiste · ':'')+(again?'🔁 Wiederholung · ':'')+'Stufe '+'★'.repeat(f.d)+'☆'.repeat(3-f.d);
   $('qluck').textContent=(G.streak?'🔥 Streak '+G.streak+' · ':'')+'⚡ schnell = mehr Glück';
   $('qtext').innerHTML=fmt(f.q);
-  $('qans').innerHTML=opts.map((o,i)=>`<button class="ans" data-i="${i}">${fmt(o.t)}</button>`).join('');
+  $('qans').innerHTML=opts.map((o,i)=>`<button class="ans" data-i="${i}"><span class="kn">${i+1}</span>${fmt(o.t)}</button>`).join('');
   $('qans').classList.add('wait'); $('qRead').style.display='block'; $('bonus').classList.add('read');
   $('box_q').classList.remove('win','lose');
   $('fb').style.display='none'; $('qNext').style.display='none';
@@ -746,20 +756,27 @@ function openPick(){
   const pool = chest && itemPool.length ? itemPool      // Gegenstände voll? Dann bietet die Kiste Waffen/Bücher an
            : [...UPS.filter(u=>p.books[u.id]?p.books[u.id]<MAX_BOOK_LVL:nB<SLOTS).map(u=>({kind:'up',u})),
               ...Object.keys(WEAPONS).filter(id=>p.w[id]?p.w[id].lvl<MAX_WEP_LVL:nW<SLOTS).map(id=>({kind:'w',id}))];
+  const keyOf=o=>o.kind+':'+(o.u?o.u.id:o.it?o.it.id:o.id); for(let i=pool.length-1;i>=0;i--) if(G.banned.has(keyOf(pool[i]))) pool.splice(i,1);
   $('pkTitle').textContent = chest ? '📦 Kiste – wähle einen Gegenstand' : `⬆️ Level ${G.level} – wähle`;
   while(opts.length<3 && pool.length){ const i=Math.floor(Math.random()*pool.length); opts.push({...pool.splice(i,1)[0], r:rollRarity(L)}); }
   if(!opts.length) opts.push({kind:'heal', r:0});   // alles voll ausgebaut
   $('pkSlots').innerHTML=slotsHtml();
-  modalHint('pkHint','pick','🃏 <b>Wähle eine Karte.</b> Waffen (🔥🌩️❄️…) greifen selbst an – bis zu 4 gleichzeitig. Bücher (📕📗…) verbessern deine Werte. Die <b>Farbe</b> zeigt die Seltenheit: grau, <span style="color:var(--r1)">blau</span>, <span style="color:var(--r2)">lila</span>, <span style="color:var(--r3)">gold</span> = immer stärker. Passt nichts? 🔄 unten gibt neue Karten gegen eine weitere Frage.');
-  $('pkLuck').textContent=`🍀 Glück ${L} – je mehr Glück, desto öfter selten, episch, legendär.`;
+  modalHint('pkHint','pick','🃏 <b>Wähle eine Karte.</b> Waffen (🔥🌩️❄️…) greifen selbst an – bis zu 4 gleichzeitig. Bücher (📕📗…) verbessern deine Werte. Die <b>Farbe</b> zeigt die Seltenheit: grau, <span style="color:var(--r1)">blau</span>, <span style="color:var(--r2)">lila</span>, <span style="color:var(--r3)">gold</span> = immer stärker. Passt nichts? 🔄 unten gibt neue Karten gegen eine weitere Frage. Mit 🚫 verbannst du eine Karte für den Rest der Runde.');
+  const luckTxt=`🍀 Glück ${L} – je mehr Glück, desto öfter selten, episch, legendär.`;
+  const draw=()=>{ $('pkLuck').textContent=luckTxt+(G.banish>0?` · 🚫 noch ${G.banish} Marke${G.banish>1?'n':''} zum Verbannen`:'');
   $('pkCards').innerHTML=opts.map((o,i)=>{ const R=RAR[o.r]; let ic,nm,tx;
     if(o.kind==='heal'){ ic='❤️‍🩹'; nm='Heiltrank'; tx='Alles ist voll ausgebaut – heilt dich vollständig.'; }
     else if(o.kind==='item'){ const l=p.items[o.it.id]||0, to=Math.min(MAX_ITEM_LVL,l+RAR[o.r].step); ic=o.it.icon; nm=o.it.name+(l?` Lv ${to}/${MAX_ITEM_LVL}`:' (neu)');
       tx=o.it.txt+(to-l>1?` (×${to-l})`:'')+(l?'':` · belegt 1 von ${SLOTS-nI} freien Plätzen`); }
     else if(o.kind==='up'){ const b=p.books[o.u.id]; ic=o.u.icon; nm=o.u.name+(b?` Lv ${b+1}/${MAX_BOOK_LVL}`:' (neu)'); tx=o.u.txt(o.u.v*R.m)+(b?'':` · belegt 1 von ${SLOTS-nB} freien Buchplätzen`); }
     else { const W_=WEAPONS[o.id], w=p.w[o.id]; ic=W_.icon; nm=W_.name+(w?` Lv ${Math.min(MAX_WEP_LVL,w.lvl+RAR[o.r].step)}/${MAX_WEP_LVL}`:' (neu)'); tx=w?(RAR[o.r].step>1?`+${RAR[o.r].step} Stufen`:'+1 Stufe')+': mehr Schaden, mehr Wirkung':W_.desc+` · belegt 1 von ${SLOTS-nW} freien Waffenplätzen`; }
-    return `<button class="card r${o.r}" data-i="${i}"><span class="rl" style="color:var(--r${o.r})">${R.name}</span><div class="big">${ic}</div><b>${nm}</b><small>${tx}</small></button>`; }).join('');
-  $('pkCards').onclick=e=>{ const b=e.target.closest('.card'); if(!b) return; const o=opts[+b.dataset.i], R=RAR[o.r];
+    return `<button class="card r${o.r}" data-i="${i}"><span class="rl" style="color:var(--r${o.r})">${R.name}</span>${G.banish>0&&o.kind!=='heal'?`<span class="bn" data-b="${i}" title="Karte verbannen">🚫</span>`:''}<div class="big">${ic}</div><b>${nm}</b><small>${tx}</small></button>`; }).join(''); };
+  draw();
+  $('pkCards').onclick=e=>{
+    const bn=e.target.closest('.bn');
+    if(bn){ const i=+bn.dataset.b; if(G.banish>0&&opts[i]){ G.banish--; G.banned.add(keyOf(opts[i])); opts.splice(i,1);
+        if(pool.length){ const j=Math.floor(Math.random()*pool.length); opts.push({...pool.splice(j,1)[0], r:rollRarity(L)}); } draw(); } return; }
+    const b=e.target.closest('.card'); if(!b) return; const o=opts[+b.dataset.i], R=RAR[o.r];
     if(o.kind==='heal') p.hp=p.maxHp;
     else if(o.kind==='item'){ const l=p.items[o.it.id]||0, to=Math.min(MAX_ITEM_LVL,l+RAR[o.r].step); for(let k=l;k<to;k++) o.it.ap(p); p.items[o.it.id]=to; }
     else if(o.kind==='up'){ o.u.ap(p, o.u.v*R.m); p.books[o.u.id]=(p.books[o.u.id]||0)+1; }
@@ -798,7 +815,7 @@ function gameOver(win){
   const D=Object.entries(G.dmgBy).filter(([k])=>WEAPONS[k]||k==='dornen').sort((x,y)=>y[1]-x[1]), mx=D.length?D[0][1]:1;
   $('overDmg').innerHTML=D.map(([k,v])=>{ const W_=WEAPONS[k]||{icon:'🌵',name:'Dornenmantel'}; return `<div class="dmgrow"><b>${W_.icon} ${W_.name}</b><i style="width:${Math.max(3,v/mx*100)}%"></i><span>${Math.round(v).toLocaleString('de-DE')}</span></div>`; }).join('')||'<p class="hint">–</p>';
   $('overWrong').innerHTML=G.wrongs.length?G.wrongs.map(f=>`<div class="wrong"><b>${fmt(f.q)}</b><br>✔ ${fmt(f.a[0])}<br><span style="color:var(--mut)">${fmt(f.e)}</span></div>`).join(''):'<p>Nichts – alles richtig! 🎉</p>';
-  retryInit();
+  retryInit(); $('overLearn').innerHTML=learnHtml(choice.area.id)+'<p class="hint">Beim nächsten Start kommen deine wackeligen Fragen zuerst dran.</p>';
   show('ovOver');
 }
 // Nach dem Spiel: falsche Fragen noch einmal selbst beantworten (Abrufen statt nur Lesen); jede richtige = +5 Startgold für die nächste Runde
@@ -810,7 +827,7 @@ function retryInit(){
   if(RT) $('retryGo').onclick=()=>{ $('overWrong').style.display='none'; retryShow(); };
 }
 function retryShow(){
-  if(RT.i>=RT.list.length){ $('overRetry').innerHTML=`<p><b>${RT.ok} von ${RT.list.length} richtig.</b> ${RT.ok?`Nächste Runde startest du mit ${prog.startGold} 🪙.`:''}</p>`; $('overWrong').style.display=''; return; }
+  if(RT.i>=RT.list.length){ $('overLearn').innerHTML=learnHtml(choice.area.id); $('overRetry').innerHTML=`<p><b>${RT.ok} von ${RT.list.length} richtig.</b> ${RT.ok?`Nächste Runde startest du mit ${prog.startGold} 🪙.`:''}</p>`; $('overWrong').style.display=''; return; }
   const f=RT.list[RT.i], opts=f.a.map((t,i)=>({t,ok:i===0})).sort(()=>Math.random()-.5);
   $('overRetry').innerHTML=`<div class="retry"><p class="hint">Frage ${RT.i+1} von ${RT.list.length}</p><div style="font-weight:700;margin:4px 0 8px">${fmt(f.q)}</div>`+
     opts.map((o,i)=>`<button class="ans" data-i="${i}">${fmt(o.t)}</button>`).join('')+`<div id="rtFb"></div></div>`;
@@ -832,6 +849,11 @@ const prog = (()=>{ const old=store.get('ls_prog',null), P=Object.assign({areas:
 const saveProg = () => store.set('ls_prog', prog);
 const qKey = f => { let h=7; for(const c of f.q) h=(h*31+c.charCodeAt(0))|0; return (h>>>0).toString(36); };
 function areaProg(id){ return prog.areas[id] || (prog.areas[id]={ok:0, seen:{}, box:{}}); }
+function learnHtml(id){ const area=LERNBEREICHE.find(a=>a.id===id), A=areaProg(id); let g=0,w=0,n=0;
+  for(const f of area.fragen){ const k=qKey(f); if(A.box[k]!==undefined) w++; else if(A.seen[k]) g++; else n++; }
+  const t=area.fragen.length, pc=x=>(100*x/t).toFixed(1)+'%';
+  return `<div class="lbar"><i class="g" style="width:${pc(g)}"></i><i class="w" style="width:${pc(w)}"></i><i class="n" style="width:${pc(n)}"></i></div>`+
+    `<div class="llg">🟢 <b>${g}</b> gesichert · 🟠 <b>${w}</b> wackelig (kommen wieder) · ⚪ <b>${n}</b> noch neu</div>`; }
 const heftOf = id => (window.HEFT||{})[id] || [];
 const pagesOpen = id => Math.min(heftOf(id).length, 1 + Math.floor(areaProg(id).ok/3));
 function noteAnswer(f, ok){
@@ -860,7 +882,7 @@ function openHeft(from){ heftFrom=from;
   $('heftArea').value=choice.area.id; renderHeft(); show('ovHeft'); }
 function renderHeft(){
   const id=$('heftArea').value, A=areaProg(id), H=heftOf(id), n=pagesOpen(id), area=LERNBEREICHE.find(a=>a.id===id);
-  $('heftStats').innerHTML=`✔ ${A.ok} richtig · 🔍 ${Object.keys(A.seen).length}/${area.fragen.length} Fragen entdeckt · 📓 ${n}/${H.length} Seiten · 🔁 ${Object.keys(A.box).length} zum Wiederholen`;
+  $('heftStats').innerHTML=learnHtml(id)+`✔ ${A.ok} richtig · 🔍 ${Object.keys(A.seen).length}/${area.fragen.length} Fragen entdeckt · 📓 ${n}/${H.length} Seiten · 🔁 ${Object.keys(A.box).length} zum Wiederholen`;
   $('heftPages').innerHTML=H.map((pg,i)=> i<n
     ? `<div class="page"><h3>${i+1}. ${esc(pg.t)}</h3><p>💡 ${fmt(pg.merke).replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>")}</p>${pg.code?`<pre class="code">${esc(pg.bsp)}</pre>`:`<p style="color:var(--mut)">Beispiel: ${fmt(pg.bsp)}</p>`}</div>`
     : `<div class="page lock"><h3>🔒 ${i+1}. ${esc(pg.t)}</h3><p>noch ${i*3-A.ok} richtige Antwort${i*3-A.ok>1?'en':''} in diesem Bereich</p></div>`).join('') || '<p class="hint">Für diesen Bereich gibt es noch keinen Hefter.</p>';
@@ -923,6 +945,7 @@ $('menuBtn').onclick=()=>{ G=null; mode='menu'; renderBoard(); updHeftInfo(); sh
 $('quitBtn').onclick=()=>{ if(G) gameOver(false); };
 $('pauseBtn').onclick=()=>{ if(mode==='play') pause(); }; $('resumeBtn').onclick=resume;
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&mode==='play') pause(); });
+for(const ev of ['blur','pagehide','orientationchange']) addEventListener(ev,()=>{ if(mode==='play') pause(); });
 
 let last=performance.now();
 function frame(now){
