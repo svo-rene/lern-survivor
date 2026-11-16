@@ -179,6 +179,8 @@ const CLASSES = [
    scale:{rate:.02}, pas:'Flink (+12 % Tempo) · +2 % Angriffstempo je Level', badge:l=>`⚡ +${2*l}% Angriff`},
   {id:'alchemist', icon:'⚗️', name:'Alchemist', weapon:'gift', hp:145, spd:.95, robe:'#b45309', hat:'#78350f',
    scale:{gold:.04}, pas:'Robust (145 Leben) · +4 % Gold je Level – mehr Kisten', badge:l=>`🪙 +${4*l}% Gold`},
+  {id:'ritter', icon:'🛡️', name:'Ritter', weapon:'schwert', hp:170, spd:.92, robe:'#64748b', hat:'#334155',
+   scale:{armor:.01}, pas:'Zäh (170 Leben) · −1 % erlittener Schaden je Level (max. 75 %)', badge:l=>`🛡️ −${Math.min(75,l)}% Schaden`},
   {id:'gelehrter', icon:'🦉', name:'Gelehrte', weapon:'blitz', hp:110, spd:1, robe:'#1d4ed8', hat:'#1e3a8a',
    scale:{xp:.02}, pas:'+2 % Erfahrung je Level – mehr Level-ups, mehr Fragen', badge:l=>`📖 +${2*l}% EXP`},
 ];
@@ -199,6 +201,8 @@ const WEAPONS = {
   pfeile:{icon:'✨', name:'Arkane Pfeile', desc:'Schnelle Pfeile auf den nächsten Gegner, durchbohren mehrere.'},
   gift:  {icon:'☠️', name:'Giftwolke', desc:'Hinterlässt Giftpfützen, die Gegner langsam zersetzen.'},
   klinge:{icon:'🪃', name:'Wirbelklinge', desc:'Fliegt hinaus und kehrt zurück – trifft auf beiden Wegen.'},
+  schwert:{icon:'⚔️', name:'Wirbelschwert', desc:'Nahkampf: schlägt im Bogen vor dir zu und stößt Gegner zurück.'},
+  schild:{icon:'🔰', name:'Schutzschild', desc:'Baut sich mit der Zeit auf. Jede Schicht fängt einen Treffer ab und stößt den Gegner weg.'},
 };
 const UPS = [
   // Bücher: v = Grundwert, wird mit Seltenheit multipliziert
@@ -249,7 +253,7 @@ let G = null, mode = 'menu';
 function newGame(){
   const p = {x:0,y:0,r:14,hp:120,maxHp:120,regen:.5,speed:170,magnet:95,dmg:1,rate:1,count:0,size:1,crit:.05,luck:0,armor:0,
     w:{}, books:{}, items:{}, goldMul:1, xpMul:1, revive:0, lifesteal:0, thorns:0, castN:0, face:1, dx:1, dy:0, hurtT:0};
-  G = {p, t:0, en:[], shots:[], meteors:[], pools:[], gold:0, chests:[], opened:0, chestMode:false, goldMsgT:0, fx:[], gems:[], bolts:[], level:1, xp:0, need:xpNeed(1), pending:0, kills:0,
+  G = {p, t:0, en:[], shots:[], slashes:[], meteors:[], pools:[], gold:0, chests:[], opened:0, chestMode:false, goldMsgT:0, fx:[], gems:[], bolts:[], level:1, xp:0, need:xpNeed(1), pending:0, kills:0,
        spawnAcc:0, nextBoss:150, streak:0, best:0, diff:1, recent:[], asked:new Set(), review:[], hist:[], wrongs:[], lastLuck:0};
   const C=choice.cls; G.cls=C; p.maxHp=p.hp=C.hp; p.speed*=C.spd; R3.setLook(C.robe, C.hat);
   addWeapon(C.weapon);
@@ -261,6 +265,8 @@ function addWeapon(id){ G.p.w[id] = {lvl:1, cd:0, ang:0}; }
 function wDmg(base){ const p=G.p; return base*p.dmg; }
 // Klassen-Bonus, wächst mit dem Level
 const lvlBonus = k => (G.cls.scale[k]||0) * G.level;
+// Rückstoß weg von "from"; schwere Gegner bewegen sich weniger
+function knock(e, from, k){ const dx=e.x-from.x, dy=e.y-from.y, d=Math.hypot(dx,dy)||1, f=e.type==='boss'?.15:e.type==='lock'?.5:1; e.x+=dx/d*k*f; e.y+=dy/d*k*f; }
 function critRoll(){ const p=G.p; p.castN++; return ((G.cls.id==='zauberer' && p.castN%4===0) || Math.random()<p.crit+lvlBonus('crit')) ? 2 : 1; }
 function nearest(x,y,max){ let b=null, bd=max*max; for(const e of G.en){ const d=(e.x-x)**2+(e.y-y)**2; if(d<bd){bd=d;b=e;} } return b; }
 
@@ -314,6 +320,20 @@ function updWeapons(dt){
         G.shots.push({kind:'klinge',x:p.x,y:p.y,vx:Math.cos(a)*480,vy:Math.sin(a)*480,life:3,age:0,r:13*p.size,dmg:wDmg(12+w.lvl*5)*c,pierce:99,hit:new Set(),crit:c>1}); }
       w.cd = 1.7/(rate*(1+w.lvl*.06));
     }
+    if(id==='schwert' && w.cd<=0){
+      const R=(75+w.lvl*7)*p.size, tg=nearest(p.x,p.y,R+60), a=tg?Math.atan2(tg.y-p.y,tg.x-p.x):Math.atan2(p.dy,p.dx);
+      const half=w.lvl>=8?Math.PI:w.lvl>=5?Math.PI*.5:Math.PI*.35, c=critRoll();
+      for(const e of G.en){ const dx=e.x-p.x, dy=e.y-p.y, d=Math.hypot(dx,dy); if(d>R+e.r) continue;
+        let da=Math.abs(Math.atan2(dy,dx)-a); if(da>Math.PI) da=2*Math.PI-da; if(da>half && d>e.r+p.r) continue;
+        hurt(e, wDmg(24+w.lvl*9)*c); knock(e, p, 34); }
+      G.slashes.push({x:p.x,y:p.y,a,half,R,life:.2,max:.2,crit:c>1});
+      w.cd = 1.05/(rate*(1+w.lvl*.06));
+    }
+    if(id==='schild'){
+      w.max=Math.min(4, 1+Math.floor(w.lvl/2.5)); w.layers=w.layers||0;
+      if(w.layers<w.max && w.cd<=0){ w.layers++; w.cd=Math.max(1.4, 4.2-w.lvl*.35)/rate; }
+      if(w.layers>=w.max) w.cd=Math.max(w.cd,.5);
+    }
     if(id==='aura'){
       w.R = (60+w.lvl*10)*p.size;
       if(w.cd<=0){ for(const e of G.en) if((e.x-p.x)**2+(e.y-p.y)**2 < (w.R+e.r)**2) hurt(e, wDmg(4+w.lvl*3)); w.cd=.35; }
@@ -355,7 +375,7 @@ function update(dt){
   const l=Math.hypot(mx,my); if(l>1){mx/=l;my/=l;}
   p.x+=mx*p.speed*dt; p.y+=my*p.speed*dt; if(mx) p.face=Math.sign(mx);
   if(mx||my){ const ll=Math.hypot(mx,my); p.dx=mx/ll; p.dy=my/ll; }
-  p.hp=Math.min(p.maxHp,p.hp+p.regen*dt); p.hurtT-=dt;
+  p.hp=Math.min(p.maxHp,p.hp+p.regen*dt); p.hurtT-=dt; p.inv=(p.inv||0)-dt;
 
   G.spawnAcc+=dt*spawnRate(); while(G.spawnAcc>=1 && G.en.length<320){ G.spawnAcc--; spawn(); }
   if(G.spawnAcc>1) G.spawnAcc=1;
@@ -388,7 +408,11 @@ function update(dt){
     e.x+=dx/d*sp*dt; e.y+=dy/d*sp*dt; e.flash-=dt; e.slow-=dt; e.frostCd=(e.frostCd||0)-dt;
     for(let k=1;k<=6;k++){ const o=G.en[(i+k)%G.en.length]; if(o===e) continue; const ox=e.x-o.x, oy=e.y-o.y, od=Math.hypot(ox,oy), m=e.r+o.r;
       if(od>0&&od<m){ const f=(m-od)/2/od; e.x+=ox*f; e.y+=oy*f; } }
-    if(d < e.r+p.r){ p.hp -= e.dmg*dt*(1-p.armor); p.hurtT=.12; tip('hurt'); if(p.thorns) hurt(e, p.thorns*dt); }
+    if(d < e.r+p.r){
+      if(p.inv>0){}   // gerade geschützt
+      else if(p.w.schild && p.w.schild.layers>0){ p.w.schild.layers--; p.inv=.6; knock(e,p,80); G.fx.push({x:p.x,y:p.y,r:46,life:.25,max:.25,col:'#67e8f9'}); }
+      else { p.hp -= e.dmg*dt*(1-Math.min(.75, p.armor+lvlBonus('armor'))); p.hurtT=.12; tip('hurt'); }
+      if(p.thorns) hurt(e, p.thorns*dt); }
   }
   G.en = G.en.filter(e=>!e.dead);
   if(p.hp<=0){
@@ -407,6 +431,7 @@ function update(dt){
 
   for(const f of G.fx) f.life-=dt; G.fx=G.fx.filter(f=>f.life>0);
   for(const b of G.bolts) b.life-=dt; G.bolts=G.bolts.filter(b=>b.life>0);
+  for(const s of G.slashes) s.life-=dt; G.slashes=G.slashes.filter(s=>s.life>0);
 
   if(G.pending>0 && mode==='play') openQuiz();
 }

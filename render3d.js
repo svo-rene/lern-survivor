@@ -2,6 +2,7 @@
 // Die Spiellogik rechnet weiter flach: Spiel-x → 3D-X, Spiel-y → 3D-Z, Einheiten = Pixel.
 'use strict';
 const R3 = (() => {
+  const slashPool = [], slashGeo = {}; let shield;
   let ren, scene, cam, ground, player, robeMat, hatMat, aura, bolts, lastW = 0, lastH = 0, treeKey = '';
   const I = {};                       // Instanced Meshes
   const M = new THREE.Matrix4(), Qt = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), E = new THREE.Euler(), C = new THREE.Color();
@@ -81,6 +82,10 @@ const R3 = (() => {
     inst('meteor', new THREE.DodecahedronGeometry(1, 0), lam('#78350f', {emissive: '#7c2d12'}), 20);
     inst('mark', new THREE.RingGeometry(.92, 1, 32).rotateX(-Math.PI / 2), basic('#f97316', {transparent: true, opacity: .7, depthWrite: false}), 20);
 
+    // Schwerthiebe: Kreisausschnitte, Geometrie je Öffnungswinkel zwischengespeichert
+    for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(undefined, basic('#f1f5f9', {transparent: true, opacity: .6, depthWrite: false, side: THREE.DoubleSide})); m.visible = false; scene.add(m); slashPool.push(m); }
+    shield = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), basic('#67e8f9', {transparent: true, opacity: .2, depthWrite: false}));
+    shield.visible = false; scene.add(shield);
     aura = new THREE.Mesh(new THREE.CircleGeometry(1, 40).rotateX(-Math.PI / 2), basic('#a78bfa', {transparent: true, opacity: .18, depthWrite: false}));
     aura.visible = false; scene.add(aura);
     bolts = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color: '#e0f2fe'}));
@@ -163,6 +168,19 @@ const R3 = (() => {
     let nm = 0; for (const m of G.meteors) { const k = m.t / m.max; put(I.meteor, nm, m.x + 120 * k, 12 + 420 * k, m.y - 60 * k, 14, 14, 14, t * 5); put(I.mark, nm++, m.x, 1.5, m.y, m.R); }
     done(I.meteor, nm); done(I.mark, nm);
     done(I.shadow, sh);
+
+    const sl = G.slashes || [];
+    slashPool.forEach((m, i) => {
+      const s = sl[i]; m.visible = !!s; if (!s) return;
+      const key = Math.round(s.half * 100);
+      if (!slashGeo[key]) slashGeo[key] = new THREE.RingGeometry(.35, 1, 24, 1, -s.half, s.half * 2).rotateX(-Math.PI / 2);
+      m.geometry = slashGeo[key]; m.position.set(s.x, 14, s.y); m.rotation.y = -s.a;
+      const k = 1 - s.life / s.max; m.scale.setScalar(s.R * (.75 + .25 * k));
+      m.material.opacity = .7 * (s.life / s.max); m.material.color.set(s.crit ? '#fde047' : '#f1f5f9');
+    });
+    const sw = p.w.schild;
+    if (sw && sw.layers > 0) { shield.visible = true; shield.position.set(p.x, 0, p.y); shield.scale.set(34, 52, 34); shield.material.opacity = .08 + .08 * sw.layers; }
+    else shield.visible = false;
 
     if (p.w.aura) { aura.visible = true; aura.position.set(p.x, 1, p.y); const R = p.w.aura.R || 60; aura.scale.set(R, 1, R); } else aura.visible = false;
 
