@@ -84,7 +84,7 @@ pre.code{background:#0008;color:#a7f3d0;font:15px/1.45 Consolas,monospace;paddin
 <canvas id="c"></canvas>
 <div id="hud">
   <div id="xpbar"><i></i></div>
-  <div class="row"><span id="lvl">Lv 1</span><div id="hp"><i></i></div><span id="time">0:00</span><span id="gold" style="color:var(--acc)"></span><span id="streak"></span><button id="pauseBtn">⏸</button></div>
+  <div class="row"><span id="lvl">Lv 1</span><span id="pas" style="font-size:13px;color:#c4b5fd"></span><div id="hp"><i></i></div><span id="time">0:00</span><span id="gold" style="color:var(--acc)"></span><span id="streak"></span><button id="pauseBtn">⏸</button></div>
   <div id="weps"></div>
 </div>
 
@@ -172,8 +172,15 @@ pre.code{background:#0008;color:#a7f3d0;font:15px/1.45 Consolas,monospace;paddin
 'use strict';
 // ================= Inhalte =================
 const CLASSES = [
-  {id:'zauberer', icon:'🧙', name:'Zauberer', desc:'Startet mit dem Feuerstab (explodiert). Passiv: jeder 4. Zauber ist kritisch (×2).', weapon:'feuer', col:'#a78bfa'},
-  {id:'?', icon:'🗡️', name:'Weitere Klassen', desc:'kommen später', off:true},
+  // scale = Bonus je Level (crit: +Krit-Chance, rate: +Angriffstempo, gold: +Gold, xp: +Erfahrung)
+  {id:'zauberer', icon:'🧙', name:'Zauberer', weapon:'feuer', hp:120, spd:1, robe:'#6d28d9', hat:'#4c1d95',
+   scale:{crit:.01}, pas:'Jeder 4. Zauber kritisch · +1 % Krit-Chance je Level', badge:l=>`🎯 +${l}% Krit`},
+  {id:'jaeger', icon:'🏹', name:'Waldläufer', weapon:'pfeile', hp:100, spd:1.12, robe:'#15803d', hat:'#14532d',
+   scale:{rate:.02}, pas:'Flink (+12 % Tempo) · +2 % Angriffstempo je Level', badge:l=>`⚡ +${2*l}% Angriff`},
+  {id:'alchemist', icon:'⚗️', name:'Alchemist', weapon:'gift', hp:145, spd:.95, robe:'#b45309', hat:'#78350f',
+   scale:{gold:.04}, pas:'Robust (145 Leben) · +4 % Gold je Level – mehr Kisten', badge:l=>`🪙 +${4*l}% Gold`},
+  {id:'gelehrter', icon:'🦉', name:'Gelehrte', weapon:'blitz', hp:110, spd:1, robe:'#1d4ed8', hat:'#1e3a8a',
+   scale:{xp:.02}, pas:'+2 % Erfahrung je Level – mehr Level-ups, mehr Fragen', badge:l=>`📖 +${2*l}% EXP`},
 ];
 const MAPS = [
   {id:'wiese', icon:'🌳', name:'Die Wiese', desc:'Weites Grasland mit Wäldchen. Bugs, Glitches und Deadlocks kommen von überall.'},
@@ -189,7 +196,7 @@ const WEAPONS = {
   frost: {icon:'❄️', name:'Frostring', desc:'Eiskristalle kreisen um dich und bremsen.'},
   aura:  {icon:'🌀', name:'Arkane Aura', desc:'Schadet allen Gegnern in deiner Nähe.'},
   meteor:{icon:'☄️', name:'Meteor', desc:'Ein Meteor schlägt bei einem Gegner ein – großer Flächenschaden.'},
-  pfeile:{icon:'✨', name:'Arkane Pfeile', desc:'Schnelle Pfeile in Laufrichtung, durchbohren Gegner.'},
+  pfeile:{icon:'✨', name:'Arkane Pfeile', desc:'Schnelle Pfeile auf den nächsten Gegner, durchbohren mehrere.'},
   gift:  {icon:'☠️', name:'Giftwolke', desc:'Hinterlässt Giftpfützen, die Gegner langsam zersetzen.'},
   klinge:{icon:'🪃', name:'Wirbelklinge', desc:'Fliegt hinaus und kehrt zurück – trifft auf beiden Wegen.'},
 };
@@ -221,6 +228,7 @@ const ITEMS = [
 ];
 const GOLD_DROP = {bug:[.12,1], glitch:[.18,1], lock:[1,3], boss:[1,25]};   // [Chance, Menge]
 const chestCost = () => 12 + G.opened*10;
+CLASSES.forEach(c=>c.desc=`Start: ${WEAPONS[c.weapon].icon} ${WEAPONS[c.weapon].name}. ${c.pas}`);
 const FOES = {
   bug:    {r:11, hp:14, sp:62,  dmg:12, xp:1, col:'#f87171', name:'Bug'},
   glitch: {r:9,  hp:9,  sp:118, dmg:10, xp:1, col:'#e879f9', name:'Glitch'},
@@ -243,18 +251,21 @@ function newGame(){
     w:{}, books:{}, items:{}, goldMul:1, xpMul:1, revive:0, lifesteal:0, thorns:0, castN:0, face:1, dx:1, dy:0, hurtT:0};
   G = {p, t:0, en:[], shots:[], meteors:[], pools:[], gold:0, chests:[], opened:0, chestMode:false, goldMsgT:0, fx:[], gems:[], bolts:[], level:1, xp:0, need:xpNeed(1), pending:0, kills:0,
        spawnAcc:0, nextBoss:150, streak:0, best:0, diff:1, recent:[], asked:new Set(), review:[], hist:[], wrongs:[], lastLuck:0};
-  addWeapon(choice.cls.weapon);
+  const C=choice.cls; G.cls=C; p.maxHp=p.hp=C.hp; p.speed*=C.spd; R3.setLook(C.robe, C.hat);
+  addWeapon(C.weapon);
 }
 const xpNeed = l => 2 + Math.floor(l*1.2 + l*l*0.05);   // schnell leveln = viele Fragen
 
 // ================= Waffen =================
 function addWeapon(id){ G.p.w[id] = {lvl:1, cd:0, ang:0}; }
 function wDmg(base){ const p=G.p; return base*p.dmg; }
-function critRoll(){ const p=G.p; p.castN++; return (p.castN%4===0 || Math.random()<p.crit) ? 2 : 1; }
+// Klassen-Bonus, wächst mit dem Level
+const lvlBonus = k => (G.cls.scale[k]||0) * G.level;
+function critRoll(){ const p=G.p; p.castN++; return ((G.cls.id==='zauberer' && p.castN%4===0) || Math.random()<p.crit+lvlBonus('crit')) ? 2 : 1; }
 function nearest(x,y,max){ let b=null, bd=max*max; for(const e of G.en){ const d=(e.x-x)**2+(e.y-y)**2; if(d<bd){bd=d;b=e;} } return b; }
 
 function updWeapons(dt){
-  const p=G.p, W_=p.w;
+  const p=G.p, W_=p.w, rate=p.rate*(1+lvlBonus('rate'));
   for(const id in W_){
     const w=W_[id]; w.cd-=dt;
     if(id==='feuer' && w.cd<=0){
@@ -262,7 +273,7 @@ function updWeapons(dt){
       const n=1+p.count+Math.floor((w.lvl-1)/2), a0=Math.atan2(t.y-p.y,t.x-p.x);
       for(let i=0;i<n;i++){ const a=a0+(i-(n-1)/2)*.22, c=critRoll();
         G.shots.push({x:p.x,y:p.y,vx:Math.cos(a)*400,vy:Math.sin(a)*400,life:1.4,r:7*p.size*(c>1?1.4:1),dmg:wDmg(14+w.lvl*5)*c,boom:42*p.size*(1+w.lvl*.1),crit:c>1}); }
-      w.cd = .85/(p.rate*(1+w.lvl*.08));
+      w.cd = .85/(rate*(1+w.lvl*.08));
     }
     if(id==='blitz' && w.cd<=0){
       let t=nearest(p.x,p.y,460); if(!t){w.cd=.1;continue;}
@@ -270,7 +281,7 @@ function updWeapons(dt){
       for(let j=0;j<jumps&&t;j++){ hit.add(t); pts.push({x:t.x,y:t.y}); hurt(t, wDmg(10+w.lvl*5)*c);
         let nb=null,bd=(150*p.size)**2; for(const e of G.en){ if(hit.has(e)||e.dead)continue; const d=(e.x-t.x)**2+(e.y-t.y)**2; if(d<bd){bd=d;nb=e;} } t=nb; }
       G.bolts.push({pts, life:.18});
-      w.cd = 1.6/(p.rate*(1+w.lvl*.06));
+      w.cd = 1.6/(rate*(1+w.lvl*.06));
     }
     if(id==='frost'){
       const n=2+w.lvl+p.count, R=70*p.size+w.lvl*6; w.ang+=dt*(2.4+w.lvl*.15);
@@ -283,25 +294,25 @@ function updWeapons(dt){
       const n=1+Math.floor(w.lvl/3)+(p.count>0?1:0);
       for(let i=0;i<n;i++){ const t=near[Math.floor(Math.random()*near.length)], c=critRoll();
         G.meteors.push({x:t.x,y:t.y,t:.55,max:.55,R:(55+w.lvl*7)*p.size,dmg:wDmg(30+w.lvl*12)*c}); }
-      w.cd = 2.6/(p.rate*(1+w.lvl*.06));
+      w.cd = 2.6/(rate*(1+w.lvl*.06));
     }
     if(id==='pfeile' && w.cd<=0){
-      const n=1+p.count+Math.floor(w.lvl/3), a0=Math.atan2(p.dy,p.dx);
+      const tg=nearest(p.x,p.y,480), n=1+p.count+Math.floor(w.lvl/3), a0=tg?Math.atan2(tg.y-p.y,tg.x-p.x):Math.atan2(p.dy,p.dx);
       for(let i=0;i<n;i++){ const a=a0+(i-(n-1)/2)*.12, c=critRoll();
         G.shots.push({kind:'pfeil',x:p.x,y:p.y,vx:Math.cos(a)*580,vy:Math.sin(a)*580,life:1,r:5*p.size,dmg:wDmg(9+w.lvl*4)*c,pierce:1+Math.floor(w.lvl/2),hit:new Set(),crit:c>1}); }
-      w.cd = .75/(p.rate*(1+w.lvl*.06));
+      w.cd = .75/(rate*(1+w.lvl*.06));
     }
     if(id==='gift' && w.cd<=0){
       const t=nearest(p.x,p.y,300), x=t?t.x:p.x, y=t?t.y:p.y;
       G.pools.push({x,y,R:(45+w.lvl*6)*p.size,life:3+w.lvl*.3,tick:0,dmg:wDmg(5+w.lvl*3)});
-      w.cd = 2.4/(p.rate*(1+w.lvl*.05));
+      w.cd = 2.4/(rate*(1+w.lvl*.05));
     }
     if(id==='klinge' && w.cd<=0){
       const t=nearest(p.x,p.y,400); if(!t){w.cd=.2;continue;}
       const n=1+Math.floor((w.lvl-1)/3)+(p.count>1?1:0), a0=Math.atan2(t.y-p.y,t.x-p.x);
       for(let i=0;i<n;i++){ const a=a0+i*Math.PI*2/n, c=critRoll();
         G.shots.push({kind:'klinge',x:p.x,y:p.y,vx:Math.cos(a)*480,vy:Math.sin(a)*480,life:3,age:0,r:13*p.size,dmg:wDmg(12+w.lvl*5)*c,pierce:99,hit:new Set(),crit:c>1}); }
-      w.cd = 1.7/(p.rate*(1+w.lvl*.06));
+      w.cd = 1.7/(rate*(1+w.lvl*.06));
     }
     if(id==='aura'){
       w.R = (60+w.lvl*10)*p.size;
@@ -390,7 +401,7 @@ function update(dt){
   // XP
   for(const g of G.gems){ const dx=p.x-g.x, dy=p.y-g.y, d=Math.hypot(dx,dy);
     if(d<p.magnet || g.pull){ g.pull=true; const s=Math.max(260,500-d)*dt; g.x+=dx/d*s; g.y+=dy/d*s; }
-    if(d<p.r+6){ g.got=true; if(g.heal) p.hp=p.maxHp; else if(g.gold) G.gold+=Math.round(g.gold*p.goldMul); else gainXp(g.v); } }
+    if(d<p.r+6){ g.got=true; if(g.heal) p.hp=p.maxHp; else if(g.gold) G.gold+=Math.round(g.gold*(p.goldMul+lvlBonus('gold'))); else gainXp(g.v); } }
   G.gems = G.gems.filter(g=>!g.got);
   if(G.gems.length>400) G.gems.splice(0,G.gems.length-400);
 
@@ -409,7 +420,7 @@ function updChests(dt){
     if(G.gold>=cost){ G.gold-=cost; G.opened++; G.chests.splice(G.chests.indexOf(c),1); G.chestMode=true; openQuiz(); return; }
     if(G.goldMsgT<=0){ toast(`📦 Kiste kostet ${cost} 🪙 – du hast ${G.gold}`); G.goldMsgT=2.5; } }
 }
-function gainXp(v){ v*=G.p.xpMul; G.xp+=v; while(G.xp>=G.need){ G.xp-=G.need; G.level++; G.need=xpNeed(G.level); G.pending++; } }
+function gainXp(v){ v*=G.p.xpMul+lvlBonus('xp'); G.xp+=v; while(G.xp>=G.need){ G.xp-=G.need; G.level++; G.need=xpNeed(G.level); G.pending++; } }
 
 // ================= Zeichnen =================
 function hash(i,j){ let h=Math.imul(i,374761393)+Math.imul(j,668265263); h=Math.imul(h^(h>>>13),1274126177); return (h^(h>>>16))>>>0; }
@@ -446,7 +457,7 @@ function hud(){
   $('hp').firstElementChild.style.width=Math.max(0,p.hp/p.maxHp*100)+'%';
   $('lvl').textContent='Lv '+G.level; const s=Math.floor(G.t); $('time').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
   $('streak').textContent=(G.streak?'🔥'+G.streak+' ':'')+'🍀'+luckNow();
-  $('gold').textContent='🪙 '+G.gold;
+  $('gold').textContent='🪙 '+G.gold; $('pas').textContent=G.cls.icon+' '+G.cls.badge(G.level);
   const sk=Object.entries(p.w).map(([k,w])=>k+w.lvl).join()+'|'+Object.entries(p.books).map(([k,l])=>k+l).join()+'|'+Object.entries(p.items).map(([k,l])=>k+l).join(); if(sk!==hud.k){ hud.k=sk; $('weps').innerHTML=slotsHtml(); }
 }
 
@@ -542,7 +553,7 @@ function gameOver(){
   mode='over'; document.body.classList.remove('playing');
   if(G.tips){ store.set('ls_tips', false); $('tipsChk').checked=false; }   // Tipps nur beim ersten Spiel, per Häkchen wieder an
   const a=G.hist.filter(Boolean).length, s=Math.floor(G.t);
-  const entry={id:Date.now(), name:G.name, area:choice.area.id, pts:a*100+s+G.best*20, ok:a, q:G.hist.length, t:s, lvl:G.level};
+  const entry={id:Date.now(), name:G.name, cls:G.cls.icon, area:choice.area.id, pts:a*100+s+G.best*20, ok:a, q:G.hist.length, t:s, lvl:G.level};
   const all=store.get('ls_scores',[]); all.push(entry); all.sort((x,y)=>y.pts-x.pts); store.set('ls_scores', all.slice(0,300));
   const rank=all.filter(x=>x.area===entry.area).indexOf(entry)+1;
   $('overPts').innerHTML=`${esc(G.name)}: ${entry.pts} Punkte`+(rank===1?' – 🥇 neuer Rekord!':rank<=10?` – Platz ${rank}`:'');
@@ -564,13 +575,13 @@ const fmtT = s => Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
 function boardHtml(area, mark){
   const L=store.get('ls_scores',[]).filter(s=>s.area===area).sort((a,b)=>b.pts-a.pts).slice(0,10);
   if(!L.length) return '<p class="hint">Noch keine Einträge – sei die oder der Erste!</p>';
-  return '<table class="board">'+L.map((s,i)=>`<tr class="${s.id===mark?'me':''}"><td>${['🥇','🥈','🥉'][i]||(i+1)+'.'}</td><td>${esc(s.name)}</td><td>${s.pts}</td><td>${s.ok}/${s.q} ✔ · ${fmtT(s.t)}</td></tr>`).join('')+'</table>';
+  return '<table class="board">'+L.map((s,i)=>`<tr class="${s.id===mark?'me':''}"><td>${['🥇','🥈','🥉'][i]||(i+1)+'.'}</td><td>${s.cls||''} ${esc(s.name)}</td><td>${s.pts}</td><td>${s.ok}/${s.q} ✔ · ${fmtT(s.t)}</td></tr>`).join('')+'</table>';
 }
 function renderBoard(){ $('board').innerHTML=boardHtml(choice.area.id); }
 
 // ================= Tipps beim ersten Spiel =================
 const TIPS = {
-  move:  '🕹️ <b>Laufen</b> mit WASD / Pfeiltasten oder auf dem Bildschirm ziehen. Dein Zauberer <b>greift von allein an</b>.',
+  move:  '🕹️ <b>Laufen</b> mit WASD / Pfeiltasten oder auf dem Bildschirm ziehen. Deine Figur <b>greift von allein an</b>. Oben neben dem Level siehst du deinen <b>Klassen-Bonus</b> – er wächst mit jedem Level.',
   gem:   '💎 Besiegte Gegner lassen <b>Kristalle</b> fallen. Lauf hin und sammle sie ein – das gibt Erfahrung (Leiste oben). Leiste voll = <b>Level-up</b>.',
   hurt:  '❤️ Gegner verletzen dich bei <b>Berührung</b> – weich ihnen aus! Dein Leben siehst du oben am roten Balken.',
   streak:'🔥 <b>Streak!</b> Mehrere richtige Antworten hintereinander geben immer mehr 🍀 Glück auf seltene Karten.',

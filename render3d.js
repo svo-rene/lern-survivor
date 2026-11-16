@@ -2,7 +2,7 @@
 // Die Spiellogik rechnet weiter flach: Spiel-x → 3D-X, Spiel-y → 3D-Z, Einheiten = Pixel.
 'use strict';
 const R3 = (() => {
-  let ren, scene, cam, ground, player, robeMat, aura, bolts, lastW = 0, lastH = 0, treeKey = '';
+  let ren, scene, cam, ground, player, robeMat, hatMat, aura, bolts, lastW = 0, lastH = 0, treeKey = '';
   const I = {};                       // Instanced Meshes
   const M = new THREE.Matrix4(), Qt = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), E = new THREE.Euler(), C = new THREE.Color();
 
@@ -52,8 +52,9 @@ const R3 = (() => {
     add(new THREE.ConeGeometry(15, 36, 8), robeMat, 0, 18, 0);
     add(new THREE.SphereGeometry(8, 10, 8), lam('#fcd9a8'), 0, 41, 0);
     add(new THREE.ConeGeometry(6, 14, 6).rotateX(Math.PI), lam('#e5e7eb'), 0, 33, 6);
-    add(new THREE.CylinderGeometry(17, 17, 2, 12), lam('#4c1d95'), 0, 47, 0);
-    const hat = add(new THREE.ConeGeometry(12, 32, 8), lam('#4c1d95'), 0, 63, 0); hat.rotation.z = .15;
+    hatMat = lam('#4c1d95');
+    add(new THREE.CylinderGeometry(17, 17, 2, 12), hatMat, 0, 47, 0);
+    const hat = add(new THREE.ConeGeometry(12, 32, 8), hatMat, 0, 63, 0); hat.rotation.z = .15;
     add(new THREE.CylinderGeometry(1.8, 1.8, 58, 5), lam('#92400e'), 17, 28, 4);
     add(new THREE.SphereGeometry(5, 8, 6), basic('#38bdf8'), 17, 59, 4);
     scene.add(player);
@@ -177,5 +178,6 @@ const R3 = (() => {
   }
 
   function toScreen(x, y, h) { P.set(x, h, y).project(cam); return {x: (P.x + 1) / 2 * lastW, y: (1 - P.y) / 2 * lastH, vis: P.z < 1}; }
-  return {init, render, toScreen};
+  function setLook(robe, hat) { robeMat.color.set(robe); hatMat.color.set(hat); }
+  return {init, render, toScreen, setLook};
 })();
