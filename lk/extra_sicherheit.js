@@ -39,16 +39,9 @@ KERKER_FRAGEN.push(
     optionen: ['0,0003 %', '0,03 %', '0,3 %', '0,0006 %'],
     erkl: 'Schlüsselraum 10⁶ = 1 000 000. 3 / 1 000 000 = 0,000003 = 0,0003 %. Sicher macht die PIN vor allem die Sperre.',
     quelle: 'OPAL LB8 8.6 Kryptoanalyse (Beispiel 1, Aufgabe 8.6.2)' },
-  { burg: 26, stufe: 2, art: 'wahl', frage: 'Sonntag Vollsicherung, Montag bis Mittwoch abends differenzielle Sicherung. Donnerstagmorgen fällt der Server aus. Was spielst du zurück?',
-    optionen: ['die Vollsicherung vom Sonntag und nur die Mittwochssicherung', 'die Vollsicherung und die Sicherungen von Mo, Di und Mi nacheinander', 'nur die Mittwochssicherung', 'nur die Vollsicherung vom Sonntag'],
-    erkl: 'Eine differenzielle Sicherung enthält alle Änderungen seit der letzten Vollsicherung. Die Mittwochssicherung reicht also zusammen mit der Vollsicherung. Nacheinander zurückspielen müsste man bei inkrementeller Sicherung.',
-    quelle: 'OPAL LB8 8.15 Datensicherung und RAID (Beispiel 1)' },
 
   // ---------------- Stufe 3 ----------------
-  { burg: 26, stufe: 3, art: 'wahl', frage: 'Sonntag Vollsicherung, Mo bis Mi inkrementell. Am Donnerstag fällt der Server aus, und die Dienstagssicherung ist beschädigt. Welcher Stand lässt sich sicher wiederherstellen?',
-    optionen: ['nur der Stand von Montagabend – die Kette ist unterbrochen', 'der Stand von Mittwochabend – jede inkrementelle Sicherung enthält alle Änderungen seit Sonntag', 'gar keiner – auch die Vollsicherung ist dann unbrauchbar', 'der Stand von Dienstagabend – nur der Mittwoch fehlt'],
-    erkl: 'Inkrementelle Sicherungen bauen aufeinander auf: Vollsicherung, dann Mo, Di, Mi. Fehlt Di, kommt man nur bis Montagabend. Bei differenzieller Sicherung spielte eine defekte Dienstagssicherung keine Rolle.',
-    quelle: 'OPAL LB8 8.15 Datensicherung und RAID (Beispiel 1, Falle)' },
+  // (Fragen zu inkrementeller/differenzieller Sicherung auf Wunsch gestrichen, 2026-11-16)
   { burg: 26, stufe: 3, art: 'wahl', frage: 'Ein Angreifer schneidet heute TLS-1.3-Verbindungen mit und erbeutet in zwei Jahren den privaten Schlüssel des Servers. Kann er die alten Mitschnitte entschlüsseln?',
     optionen: ['Nein – die Session-Keys entstanden per (EC)DHE und wurden nie übertragen; der private Schlüssel diente nur zum Signieren.', 'Ja – damit entschlüsselt er den übertragenen Sitzungsschlüssel.', 'Ja – TLS verschlüsselt alle Daten direkt mit dem privaten Schlüssel.', 'Nein – TLS-Daten werden gar nicht verschlüsselt, nur signiert.'],
     erkl: 'Forward Secrecy: Für jede Verbindung gibt es neue Diffie-Hellman-Werte, die danach verworfen werden. Beim alten RSA-Schlüsseltransport ginge der Angriff – deshalb erlaubt TLS 1.3 nur noch (EC)DHE.',
