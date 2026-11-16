@@ -1,6 +1,6 @@
 # 🧙 Lern-Survivor
 
-Ein kleines Survivor-Spiel für den Informatikunterricht: Gegnerwellen überleben, Kristalle sammeln – und **bei jedem Level-up eine Frage beantworten**. Richtige und schnelle Antworten sowie Streaks bringen 🍀 Glück auf seltene Karten. Falsch beantwortete Fragen kommen später wieder – auch in der nächsten Runde. Nach 10 Minuten kommt der Endboss **🎓 Der Tutor**: Wer ihn besiegt, hat die Runde bestanden.
+Ein kleines Survivor-Spiel für den Informatikunterricht: Gegnerwellen überleben, Kristalle sammeln – und **bei jedem Level-up eine Frage beantworten**. Richtige und schnelle Antworten sowie Streaks bringen 🍀 Glück auf seltene Karten. Falsch beantwortete Fragen kommen später wieder – auch in der nächsten Runde. Eine Runde hat **3 Welten** (🌳 Wiese, 🏜️ Wüste, ❄️ Eisland, je etwa 3 Minuten) mit je einem Endboss: **📝 Leistungskontrolle**, **🧑‍🏫 Der Tutor** und zum Schluss **🎓 Das Abitur** – wer es besteht, hat die Runde gewonnen.
 
 **📓 Hefter:** Mit richtigen Antworten schaltet man Hefterseiten frei (Merke + Beispiel, je Lernbereich 14–18 Seiten, Ordner `heft/`). Klassen werden über Lernziele freigeschaltet.
 

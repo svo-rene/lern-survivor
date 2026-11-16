@@ -3,7 +3,7 @@
 'use strict';
 const R3 = (() => {
   const slashPool = [], slashGeo = {}; let shield;
-  let ren, scene, cam, ground, player, robeMat, hatMat, aura, bolts, lastW = 0, lastH = 0, treeKey = '';
+  let hemi, worldNow = 0, ren, scene, cam, ground, player, robeMat, hatMat, aura, bolts, lastW = 0, lastH = 0, treeKey = '';
   const I = {};                       // Instanced Meshes
   const M = new THREE.Matrix4(), Qt = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), E = new THREE.Euler(), C = new THREE.Color();
 
@@ -15,12 +15,18 @@ const R3 = (() => {
   function done(m, n) { m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
   function hash(i, j) { let h = Math.imul(i, 374761393) + Math.imul(j, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; }
 
-  function grassTexture() {
+  // Welten: Boden, Himmel und Deko-Farben
+  const THEMES = [
+    {base: '#5f9f45', dots: ['#6cab4e', '#548f3c', '#78b75a', '#4f8738'], spots: ['#fde68a', '#fff'], sky: '#a7d8f0', low: '#4a6b2a', pine: '#2f7d3a', oak: '#4f9d3f', bush: '#3f8f3a', rock: '#9ca3af', trunk: '#7c4a21'},
+    {base: '#d9b26a', dots: ['#e3c07a', '#c99f55', '#edd08f', '#b98d48'], spots: ['#a16207', '#fff7d6'], sky: '#f6dcae', low: '#8a6a32', pine: '#4d7c0f', oak: '#a8a05a', bush: '#a16207', rock: '#c2410c', trunk: '#78350f'},
+    {base: '#dbe7f5', dots: ['#e8f1fb', '#c7d7ec', '#f8fafc', '#cbd5e1'], spots: ['#93c5fd', '#fff'], sky: '#c3d3e6', low: '#7b8ba3', pine: '#1e5162', oak: '#e2e8f0', bush: '#93c5fd', rock: '#64748b', trunk: '#57534e'},
+  ];
+  function grassTexture(T = THEMES[0]) {
     const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
-    x.fillStyle = '#5f9f45'; x.fillRect(0, 0, 256, 256);
+    x.fillStyle = T.base; x.fillRect(0, 0, 256, 256);
     let s = 7; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
-    for (let k = 0; k < 900; k++) { x.fillStyle = ['#6cab4e', '#548f3c', '#78b75a', '#4f8738'][k % 4]; x.fillRect(rnd() * 256, rnd() * 256, 2 + rnd() * 3, 2 + rnd() * 5); }
-    for (let k = 0; k < 10; k++) { x.fillStyle = k % 2 ? '#fde68a' : '#fff'; x.fillRect(rnd() * 252, rnd() * 252, 3, 3); }
+    for (let k = 0; k < 900; k++) { x.fillStyle = T.dots[k % 4]; x.fillRect(rnd() * 256, rnd() * 256, 2 + rnd() * 3, 2 + rnd() * 5); }
+    for (let k = 0; k < 10; k++) { x.fillStyle = T.spots[k % 2]; x.fillRect(rnd() * 252, rnd() * 252, 3, 3); }
     const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
     return t;
   }
@@ -29,7 +35,7 @@ const R3 = (() => {
     ren = new THREE.WebGLRenderer({canvas, antialias: true}); ren.setPixelRatio(Math.min(2, devicePixelRatio || 1));
     scene = new THREE.Scene(); scene.background = new THREE.Color('#a7d8f0'); scene.fog = new THREE.Fog('#a7d8f0', 900, 1750);
     cam = new THREE.PerspectiveCamera(48, 1, 10, 4000);
-    scene.add(new THREE.HemisphereLight('#eaf6ff', '#4a6b2a', 1.4));
+    hemi = new THREE.HemisphereLight('#eaf6ff', '#4a6b2a', 1.4); scene.add(hemi);
     const sun = new THREE.DirectionalLight('#fff4d6', 1.8); sun.position.set(-300, 700, 250); scene.add(sun);
 
     const tex = grassTexture(); tex.repeat.set(4096 / 256, 4096 / 256);
@@ -68,8 +74,9 @@ const R3 = (() => {
     inst('spam', new THREE.ConeGeometry(1, 1.6, 6), lam('#fff', {emissive: '#422006'}), 80);      // Fernkämpfer
     inst('fork', new THREE.DodecahedronGeometry(1, 0), lam('#fff'), 200);                        // teilt sich
     inst('over', new THREE.CylinderGeometry(1, 1, 1, 8), lam('#fff', {emissive: '#431407'}), 80);  // stürmt los
+    inst('abi', new THREE.IcosahedronGeometry(1, 1), lam('#fff', {emissive: '#2e1065'}), 2);        // Das Abitur (Endboss)
     inst('tutor', new THREE.IcosahedronGeometry(1, 0), lam('#fff', {emissive: '#422006'}), 2);
-    inst('cap', new THREE.BoxGeometry(1, .18, 1), lam('#111827'), 2);                            // Doktorhut des Tutors
+    inst('cap', new THREE.BoxGeometry(1, .18, 1), lam('#111827'), 4);                            // Doktorhut (Tutor, Abitur)
     inst('eshot', new THREE.SphereGeometry(1, 8, 6), basic('#fff'), 300);                         // gegnerische Geschosse
     inst('eye', new THREE.SphereGeometry(1, 6, 4), basic('#111'), 700);
 
@@ -112,7 +119,7 @@ const R3 = (() => {
     for (const k in n) done(I[k], n[k]);
   }
 
-  const FOE_COL = {bug: '#ef4444', glitch: '#e879f9', lock: '#94a3b8', boss: '#dc2626', spam: '#facc15', fork: '#4ade80', over: '#fb923c', tutor: '#f59e0b'};
+  const FOE_COL = {bug: '#ef4444', glitch: '#e879f9', lock: '#94a3b8', boss: '#dc2626', abi: '#a78bfa', spam: '#facc15', fork: '#4ade80', over: '#fb923c', tutor: '#f59e0b'};
   function render(G, W, H) {
     if (W !== lastW || H !== lastH) { ren.setSize(W, H, false); cam.aspect = W / H; cam.updateProjectionMatrix(); lastW = W; lastH = H; }
     const p = G.p, t = G.t;
@@ -127,7 +134,7 @@ const R3 = (() => {
     let sh = 0; put(I.shadow, sh++, p.x, .5, p.y, 16);
 
     // Gegner
-    const n = {bug: 0, glitch: 0, lock: 0, boss: 0, spam: 0, fork: 0, over: 0, tutor: 0}; let ne = 0, ncap = 0;
+    const n = {bug: 0, glitch: 0, lock: 0, boss: 0, abi: 0, spam: 0, fork: 0, over: 0, tutor: 0}; let ne = 0, ncap = 0;
     for (const e of G.en) {
       const m = I[e.type], i = n[e.type]++, r = e.r, ry = Math.atan2(p.x - e.x, p.y - e.y);
       let y = r, sx = r, sy = r, sz = r;
@@ -135,13 +142,14 @@ const R3 = (() => {
       if (e.type === 'glitch') { y = r * 1.6 + Math.sin(t * 6 + e.y) * 3; }
       if (e.type === 'lock') { sx = sz = r * 1.6; sy = r * 1.6; y = r * .8; }
       if (e.type === 'boss') { y = r * 1.3; }
+      if (e.type === 'abi') { y = r * 1.2 + Math.sin(t * 3) * 5; put(I.cap, ncap++, e.x, y + r * 1.0, e.y, r * 1.6, r * 1.6, r * 1.6, -t * .5); }
       if (e.type === 'spam') { sy = r * 1.4; y = r * 1.1; }
       if (e.type === 'over') { sy = r * 1.5; y = r * .75 + (e.dash > 0 ? 6 : 0); }
       if (e.type === 'fork') { y = r + Math.abs(Math.sin(t * 10 + e.x)) * 2; }
       if (e.type === 'tutor') { y = r * 1.25 + Math.sin(t * 2) * 4; put(I.cap, ncap++, e.x, y + r * 1.05, e.y, r * 1.5, r * 1.5, r * 1.5, t * .7); }
       put(m, i, e.x, y, e.y, sx, sy, sz, e.type === 'glitch' || e.type === 'boss' ? t * 2 + e.x : e.type === 'tutor' ? t * .7 : ry);
-      const big = e.type === 'boss' || e.type === 'tutor';   // Bosse nur leicht aufhellen, sonst blinken sie dauerhaft weiß
-      col(m, i, e.flash > 0 ? (big ? (e.type === 'tutor' ? '#fde68a' : '#f87171') : '#ffffff') : e.slow > 0 && !big ? '#7dd3fc' : e.dash > 0 ? '#fde047' : FOE_COL[e.type]);
+      const big = e.type === 'boss' || e.type === 'tutor' || e.type === 'abi';   // Bosse nur leicht aufhellen, sonst blinken sie dauerhaft weiß
+      col(m, i, e.flash > 0 ? (big ? (e.type === 'tutor' ? '#fde68a' : e.type === 'abi' ? '#ddd6fe' : '#f87171') : '#ffffff') : e.slow > 0 && !big ? '#7dd3fc' : e.dash > 0 ? '#fde047' : FOE_COL[e.type]);
       put(I.shadow, sh++, e.x, .5, e.y, r * 1.1);
       if (e.type !== 'boss' && e.type !== 'spam') for (const s of [-1, 1]) {   // Augen Richtung Zauberer
         const ex = e.x + Math.sin(ry) * r * .9 + Math.cos(ry) * s * r * .35, ez = e.y + Math.cos(ry) * r * .9 - Math.sin(ry) * s * r * .35;
@@ -209,5 +217,11 @@ const R3 = (() => {
 
   function toScreen(x, y, h) { P.set(x, h, y).project(cam); return {x: (P.x + 1) / 2 * lastW, y: (1 - P.y) / 2 * lastH, vis: P.z < 1}; }
   function setLook(robe, hat) { robeMat.color.set(robe); hatMat.color.set(hat); }
-  return {init, render, toScreen, setLook};
+  function setWorld(i) {
+    if (!scene) return; const T = THEMES[i] || THEMES[0];
+    if (i !== worldNow) { const tex = grassTexture(T); tex.repeat.set(4096 / 256, 4096 / 256); ground.material.map.dispose(); ground.material.map = tex; ground.material.needsUpdate = true; worldNow = i; }
+    scene.background.set(T.sky); scene.fog.color.set(T.sky); hemi.groundColor.set(T.low);
+    for (const k of ['pine', 'oak', 'bush', 'rock', 'trunk']) I[k].material.color.set(T[k]);
+  }
+  return {init, render, toScreen, setLook, setWorld};
 })();
