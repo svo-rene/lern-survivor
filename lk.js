@@ -20,6 +20,7 @@
     let x = f;
     if (typeof f.gen === 'function') { try { x = Object.assign({}, f, f.gen(Z)); } catch (e) { return null; } }
     if (!x.optionen || x.optionen.length < 2 || !x.frage) return null;
+    if (x.bild) return null;   // Fragen mit Grafik (z. B. ER-Diagramm) kann das Spiel nicht anzeigen
     let q = String(x.frage);
     if (x.code) q += '\n`' + String(x.code).replace(/`/g, "'") + '`';
     return {d: Math.min(3, Math.max(1, x.stufe || 1)), q, a: x.optionen.map(String), e: x.erkl || ''};

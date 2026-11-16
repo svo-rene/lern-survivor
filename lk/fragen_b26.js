@@ -368,7 +368,7 @@ KERKER_FRAGEN.push(
         antworten: [String(h)], erkl: `${[...w].map((c, i) => `${i + 1} · ${c.charCodeAt(0)}`).join(' + ')} = ${teile.join(' + ')} = ${teile.reduce((s, t) => s + t, 0)}, mod 997 = ${h}. Dreht man die Buchstaben um, ändert sich der Hash – die Position zählt mit.` };
     } },
   { id: 'k26_060', burg: 26, kap: 85, stufe: 1, art: 'wahl', frage: 'Ein Server hat zwei gespiegelte Festplatten (RAID 1). Wovor schützt das nicht?',
-    optionen: ['vor versehentlichem Löschen', 'vor dem Ausfall einer Festplatte', 'vor dem Ausfall der zweiten Platte', 'RAID 1 schützt vor allem.'],
+    optionen: ['vor versehentlichem Löschen', 'vor dem Ausfall einer Festplatte', 'vor einer Betriebsunterbrechung, wenn eine Platte defekt wird', 'RAID 1 schützt vor allem.'],
     erkl: 'Eine Löschung landet sofort auf beiden Platten. RAID erhöht die Verfügbarkeit bei Plattendefekten, ersetzt aber keine Datensicherung. Dazu die 3-2-1-Regel: 3 Kopien, 2 Medien, 1 außer Haus.', quelle: 'OPAL LB 8 8.15 Datensicherung und RAID; Abiturvorbereitung 6.2.8' },
   { id: 'k26_061', burg: 26, kap: 85, stufe: 3, art: 'mehr', frage: 'Ein Auktionshaus verschickt Gutachten digital signiert (nicht verschlüsselt). Kreuze alle Schutzziele an, die die Signatur sichert.',
     optionen: ['Integrität', 'Authentizität', 'Verbindlichkeit', 'Vertraulichkeit', 'Verfügbarkeit'], richtig: [0, 1, 2],

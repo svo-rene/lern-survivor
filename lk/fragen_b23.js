@@ -46,7 +46,7 @@ KERKER_FRAGEN.push(
     erkl: 'Nur Sack(...) erzeugt ein Objekt – dreimal. Zuweisungen wie b = a lassen nur einen weiteren Namen auf ein vorhandenes Objekt zeigen.',
     quelle: 'OPAL LK LB 4/5, 4.3 Klassen als Baupläne (Objekte erzeugen)' },
   { id: 'k23_008', burg: 23, kap: 50, stufe: 3, art: 'wahl',
-    frage: 'Eine Funktion soll eine NEUE sortierte Liste liefern, beginnt aber mit liste = ergebnisse und sortiert dann liste. Was passiert mit ergebnisse?',
+    frage: 'Eine Funktion soll eine NEUE sortierte Liste liefern, beginnt aber mit liste = ergebnisse und sortiert dann liste durch Vertauschen ihrer Elemente. Was passiert mit ergebnisse?',
     optionen: ['ergebnisse wird mitsortiert', 'ergebnisse bleibt unverändert', 'Python meldet einen Fehler', 'ergebnisse wird geleert'],
     erkl: 'liste und ergebnisse verweisen auf dieselbe Liste. Zuweisung kopiert nicht (call by sharing). Eine echte Kopie entsteht mit ergebnisse.copy() oder ergebnisse[:].',
     quelle: 'OPAL Abiturvorbereitung 2.2, Aufgabe 2.2.3 a (Fehler „liste = ergebnisse“)' },

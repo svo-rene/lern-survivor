@@ -252,10 +252,10 @@ KERKER_FRAGEN.push(
         code: '00 LOAD 10    (Zelle 10 in den Akku)\n01 SUB 11     (Zelle 11 abziehen)\n02 STORE 12   (Akku in Zelle 12)\n03 ADD 12     (Zelle 12 addieren)\n04 STORE 13\n05 HLT',
         antworten: [String(e)], erkl: `Akku: ${x}, dann ${x} − ${y} = ${d}, Zelle 12 = ${d}, dann ${d} + ${d} = ${e}, Zelle 13 = ${e}.` };
     } },
-  { id: 'k28_057', burg: 28, kap: 104, stufe: 3, art: 'wahl', frage: 'Akkumulator-Maschine (JZ = springe, wenn Akku = 0). Zelle 20 enthält 10, Zelle 21 enthält 3. Was passiert?',
+  { id: 'k28_057', burg: 28, kap: 104, stufe: 3, art: 'wahl', frage: 'Akkumulator-Maschine (JZ = springe, wenn Akku = 0). Zelle 20 enthält 10, Zelle 21 enthält 3. Der Akku kann hier beliebig große und negative Zahlen speichern (kein Überlauf). Was passiert?',
     code: '00 LOAD 20\n01 JZ 05\n02 SUB 21\n03 JMP 01\n04 HLT\n05 HLT',
     optionen: ['Es hält nie an, weil der Akku nie genau 0 wird', 'Es hält nach 3 Durchläufen mit Akku = 1 an', 'Es hält nach 4 Durchläufen mit Akku = 0 an', 'Es hält sofort an, weil 10 nicht 0 ist'],
-    erkl: 'Der Akku geht 10, 7, 4, 1, −2 … – die Terminierung ist verletzt. JZ springt nur bei genau 0. Bei 12 statt 10 würde SUB viermal ausgeführt und das Programm hielte – mit 10 springt der Akku über die 0 hinweg.', quelle: 'OPAL LB1 4.1, Abiturvorbereitung 2.3 (Algorithmeneigenschaften)' },
+    erkl: 'Der Akku geht 10, 7, 4, 1, −2 … – die Terminierung ist verletzt. JZ springt nur bei genau 0. Bei 12 statt 10 würde SUB viermal ausgeführt und das Programm hielte – mit 10 springt der Akku über die 0 hinweg. (Mit einem 8-Bit-Akku wie in Aufgabe 4.1.7 würde er nach 174 Subtraktionen durch den Überlauf doch 0 erreichen.)', quelle: 'OPAL LB1 4.1, Abiturvorbereitung 2.3 (Algorithmeneigenschaften)' },
   { id: 'k28_058', burg: 28, kap: 104, stufe: 2, art: 'eingabe', zahl: true, frage: '', antworten: [], erkl: '', quelle: 'OPAL Abiturvorbereitung 1.1.8 c',
     gen: (z) => {
       const n = z.int(16, 24);
@@ -279,7 +279,7 @@ KERKER_FRAGEN.push(
     optionen: ['Stimmt nicht: Die Wartezeit auf den Speicher bleibt gleich', 'Stimmt immer, die Laufzeit halbiert sich bei doppeltem Takt', 'Stimmt, mit großem Cache wird es sogar mehr als doppelt so schnell', 'Stimmt nicht, ein höherer Takt macht Programme langsamer'],
     erkl: 'Nur der Taktanteil halbiert sich, die Wartezeit auf den Arbeitsspeicher hängt nicht vom Prozessortakt ab. Beispiel: 0,5 ns + 3 ns Wartezeit = 3,5 ns, mit 4 GHz 0,25 ns + 3 ns = 3,25 ns – nur etwa 7 % schneller.', quelle: 'OPAL LB1 6.2 Übungsstunde, Station 5.6; Abiturvorbereitung 1.1.1 f' },
   { id: 'k28_063', burg: 28, kap: 164, stufe: 3, art: 'wahl', frage: '„Mein Prozessor hat 4 Kerne mit Multithreading, also 8 Threads. Damit ist er genauso schnell wie ein Prozessor mit 8 Kernen.“ Welche Stellungnahme ist stichhaltig?',
-    optionen: ['Nur teilweise: Es gibt trotzdem nur 4 Rechenwerke', 'Stimmt, 8 Threads entsprechen genau 8 echten Kernen', 'Stimmt nicht, Multithreading macht einen Prozessor langsamer', 'Stimmt, sobald das Programm nur einen einzigen Thread hat'],
+    optionen: ['Nur teilweise: Es gibt trotzdem nur 4 Rechenwerke', 'Stimmt, 8 Threads entsprechen genau 8 echten Kernen', 'Stimmt nicht, Multithreading macht einen Prozessor langsamer', 'Stimmt, weil Multithreading den Takt jedes Kerns verdoppelt'],
     erkl: 'Beim Multithreading nutzt ein Kern Wartezeiten für einen zweiten Befehlsstrom; 8 echte Kerne rechnen 8 Threads wirklich gleichzeitig. Multithreading füllt Lücken, verdoppelt aber nicht die Rechenleistung. Ein Programm mit nur einem Thread profitiert von beidem kaum.', quelle: 'OPAL Abiturvorbereitung 1.1.8 d' },
   { id: 'k28_064', burg: 28, kap: 164, stufe: 2, art: 'wahl', frage: 'Warum macht ein Cache den Rechner schneller?',
     optionen: ['Oft gebrauchte Daten liegen in einem kleinen, schnellen Speicher', 'Er erhöht die Taktfrequenz des Prozessors bei Bedarf', 'Er ersetzt den langsamen Arbeitsspeicher vollständig', 'Er speichert Daten dauerhaft, auch nach dem Ausschalten'],
