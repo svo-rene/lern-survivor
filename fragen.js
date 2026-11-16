@@ -3,6 +3,8 @@
 // a = Antworten – die ERSTE ist immer die richtige (wird im Spiel gemischt), e = kurze Erklärung.
 // Mehrzeiliger Code: C('zeile 1', 'zeile 2', …) – wird als Codeblock angezeigt.
 const C = (...lines) => '\n`' + lines.join('\n') + '`';
+// Beispiel-Suchbaum (eingefügt: 8, 3, 10, 1, 6, 14, 4, 7, 13)
+const BST = C('       8', '     /   \\', '    3     10', '   / \\      \\', '  1   6      14', '     / \\    /', '    4   7  13');
 window.LERNBEREICHE = [
 {
   id: 'algo', icon: '📊', name: 'Algorithmen, Sortieren & Komplexität', stufe: 'Informatik Leistungskurs',
@@ -119,7 +121,7 @@ window.LERNBEREICHE = [
   ]
 },
 {
-  id: 'daten', icon: '🧱', name: 'Datenstrukturen', stufe: 'Informatik LK · Feld, verkettete Liste, Stapel, Schlange, Baum',
+  id: 'daten', icon: '🧱', name: 'Datenstrukturen', stufe: 'Informatik LK · Feld, Liste, Stapel, Schlange, Baum, Suchbaum, Rekursion',
   fragen: [
     // ---------- Stufe 1 ----------
     {d:1, q:'Nach welchem Prinzip arbeitet ein Stapel (Stack)?', a:['LIFO – last in, first out','FIFO – first in, first out','Zufällig','Nach Größe sortiert'], e:'Wie ein Tellerstapel: Was zuletzt drauf kam, wird zuerst wieder genommen.'},
@@ -163,6 +165,41 @@ window.LERNBEREICHE = [
     {d:3, q:'Ein Baum hat 10 Knoten, davon 6 Blätter. Wie viele innere Knoten (mit Kindern) hat er?', a:['4','6','10','5'], e:'Jeder Knoten ist entweder Blatt oder innerer Knoten: 10 − 6 = 4.'},
     {d:3, q:'Welche Aussage über Bäume stimmt?', a:['Jeder Knoten ist zusammen mit seinen Nachfahren selbst wieder ein Baum (Teilbaum).','Ein Baum darf Kreise enthalten.','Jeder Knoten hat genau zwei Kinder.','Blätter haben immer die gleiche Tiefe.'], e:'Diese Selbstähnlichkeit macht Bäume später so praktisch für Algorithmen.'},
     {d:3, q:'Zwischen zwei Knoten eines Baums gibt es … (Kanten in beide Richtungen begehbar)', a:['genau einen Weg.','keinen Weg.','immer zwei Wege.','beliebig viele Wege.'], e:'Bäume sind zusammenhängend (mindestens ein Weg) und kreisfrei (höchstens einer).'},
+
+    // ---------- Rekursion ----------
+    {d:1, q:'Was ist eine rekursive Funktion?', a:['Eine Funktion, die sich selbst aufruft.','Eine Funktion ohne Parameter.','Eine Funktion mit einer Schleife.','Eine Funktion, die nichts zurückgibt.'], e:'Sie löst ein Problem, indem sie dieselbe Aufgabe für ein kleineres Teilproblem erledigt.'},
+    {d:1, q:'Was braucht jede Rekursion, damit sie irgendwann endet?', a:['Eine Abbruchbedingung (Basisfall)','Eine while-Schleife','Eine globale Variable','Mindestens zwei Parameter'], e:'Im Basisfall wird direkt ein Ergebnis geliefert, ohne sich erneut aufzurufen.'},
+    {d:2, q:'Was wird ausgegeben?' + C('def f(n):', '    if n == 0:', '        return 0', '    return n + f(n - 1)', '', 'print(f(4))'), a:['10','4','24','0'], e:'f(4) = 4 + 3 + 2 + 1 + 0 = 10.'},
+    {d:2, q:'Was wird ausgegeben?' + C('def fak(n):', '    if n <= 1:', '        return 1', '    return n * fak(n - 1)', '', 'print(fak(4))'), a:['24','10','4','16'], e:'fak(4) = 4 · 3 · 2 · 1 = 24.'},
+    {d:2, q:'Wie oft wird `fak` insgesamt aufgerufen, wenn man `fak(4)` startet?' + C('def fak(n):', '    if n <= 1:', '        return 1', '    return n * fak(n - 1)'), a:['4-mal','3-mal','5-mal','24-mal'], e:'fak(4) → fak(3) → fak(2) → fak(1). Bei fak(1) greift der Basisfall.'},
+    {d:2, q:'Was passiert, wenn eine rekursive Funktion keine Abbruchbedingung hat?', a:['Sie ruft sich immer weiter auf, bis der Aufrufstapel überläuft (RecursionError).','Sie hört nach 10 Aufrufen von selbst auf.','Sie gibt None zurück.','Python fügt automatisch einen Basisfall ein.'], e:'Jeder Aufruf belegt Platz auf dem Aufrufstapel – irgendwann ist der voll.'},
+    {d:2, q:'In welcher Datenstruktur merkt sich Python die noch offenen Funktionsaufrufe?', a:['In einem Stapel (Aufrufstapel)','In einer Schlange','In einem Baum','In einem Feld fester Größe'], e:'Der zuletzt gestartete Aufruf ist als Erstes fertig – LIFO.'},
+    {d:2, q:'Was wird ausgegeben?' + C('def z(n):', '    if n > 0:', '        print(n)', '        z(n - 1)', '', 'z(3)'), a:['3 2 1','1 2 3','3','3 2 1 0'], e:'Erst ausgeben, dann mit dem kleineren n weitermachen. Bei n = 0 passiert nichts mehr.'},
+    {d:3, q:'Was wird ausgegeben?' + C('def z(n):', '    if n > 0:', '        z(n - 1)', '        print(n)', '', 'z(3)'), a:['1 2 3','3 2 1','0 1 2 3','3'], e:'Der Ausdruck kommt erst, wenn der innere Aufruf fertig ist. z(1) ist zuerst fertig, also kommt 1 zuerst.'},
+    {d:3, q:'Was liefert `summe([2, 5, 1])`?' + C('def summe(l):', '    if l == []:', '        return 0', '    return l[0] + summe(l[1:])'), a:['8','2','1','[2, 5, 1]'], e:'2 + summe([5, 1]) = 2 + 5 + summe([1]) = 2 + 5 + 1 + summe([]) = 8.'},
+    {d:3, q:'Was berechnet diese Funktion für den Kopf einer verketteten Liste?' + C('def laenge(k):', '    if k is None:', '        return 0', '    return 1 + laenge(k.next)'), a:['Die Anzahl der Knoten','Den Wert des letzten Knotens','Die Summe aller Werte','Immer 1'], e:'Jeder Knoten zählt 1 und gibt den Rest der Liste an den nächsten Aufruf weiter. Bei None ist Schluss.'},
+    {d:3, q:'Warum ist diese Funktion für große n sehr langsam?' + C('def fib(n):', '    if n < 2:', '        return n', '    return fib(n - 1) + fib(n - 2)'), a:['Dieselben Werte werden immer wieder neu berechnet – die Zahl der Aufrufe wächst exponentiell.','Rekursion ist in Python grundsätzlich verboten.','Die Abbruchbedingung fehlt.','Die Addition ist zu langsam.'], e:'fib(4) braucht schon 9 Aufrufe, fib(30) schon über 2,6 Millionen.'},
+
+    // ---------- Binäre Suchbäume ----------
+    {d:1, q:'Was ist ein Binärbaum?', a:['Ein Baum, in dem jeder Knoten höchstens zwei Kinder hat.','Ein Baum, der nur 0 und 1 speichert.','Ein Baum mit genau zwei Knoten.','Ein Baum, in dem jeder Knoten genau zwei Kinder hat.'], e:'Die Kinder heißen linkes und rechtes Kind.'},
+    {d:1, q:'Welche Regel gilt in einem binären Suchbaum für jeden Knoten?', a:['Links stehen nur kleinere, rechts nur größere Werte.','Links stehen nur größere, rechts nur kleinere Werte.','Kinder sind immer größer als ihr Elternknoten.','Die Werte stehen in Einfügereihenfolge.'], e:'Die Regel gilt für den ganzen linken bzw. rechten Teilbaum, nicht nur für die direkten Kinder.'},
+    {d:1, q:'Wo steht in einem binären Suchbaum der kleinste Wert?', a:['Ganz links: von der Wurzel immer nach links, bis es nicht weitergeht.','Immer in der Wurzel.','Ganz rechts.','In irgendeinem Blatt.'], e:'Links ist immer kleiner – der Knoten ohne linkes Kind am Ende dieses Wegs ist das Minimum.'},
+    {d:1, q:'Man sucht im binären Suchbaum einen Wert, der kleiner ist als der Wert im aktuellen Knoten. Wie geht es weiter?', a:['Im linken Teilbaum','Im rechten Teilbaum','In beiden Teilbäumen','Zurück zur Wurzel'], e:'Alle kleineren Werte stehen links. Der rechte Teilbaum muss gar nicht angeschaut werden.'},
+    {d:2, q:'Welche Knoten werden bei der Suche nach 7 besucht?' + BST, a:['8, 3, 6, 7','8, 10, 7','1, 3, 4, 6, 7','8, 3, 1, 6, 7'], e:'7 < 8 → links, 7 > 3 → rechts, 7 > 6 → rechts, gefunden.'},
+    {d:2, q:'Wo wird die 5 eingefügt?' + BST, a:['Als rechtes Kind von 4','Als linkes Kind von 7','Als linkes Kind von 6','Als rechtes Kind von 1'], e:'5 < 8 → links, 5 > 3 → rechts, 5 < 6 → links, 5 > 4 → rechts. Dort ist der Platz frei.'},
+    {d:2, q:'In welcher Reihenfolge werden die Knoten bei der Inorder-Traversierung besucht?' + BST, a:['1, 3, 4, 6, 7, 8, 10, 13, 14','8, 3, 1, 6, 4, 7, 10, 14, 13','1, 4, 7, 6, 3, 13, 14, 10, 8','8, 3, 10, 1, 6, 14, 4, 7, 13'], e:'Inorder = links, Knoten, rechts. Beim Suchbaum kommen die Werte so aufsteigend sortiert heraus.'},
+    {d:2, q:'Was bedeutet Inorder-Traversierung?', a:['Linken Teilbaum, dann den Knoten, dann rechten Teilbaum besuchen','Erst den Knoten, dann links, dann rechts','Erst links, dann rechts, dann den Knoten','Ebene für Ebene von oben nach unten'], e:'„In“ = der Knoten kommt in der Mitte. Preorder: Knoten zuerst, Postorder: Knoten zuletzt.'},
+    {d:2, q:'Welche Höhe hat der Baum (Kanten auf dem längsten Weg von der Wurzel zu einem Blatt)?' + BST, a:['3','4','2','9'], e:'Längste Wege: 8–3–6–4, 8–3–6–7 und 8–10–14–13, je 3 Kanten.'},
+    {d:2, q:'In einen leeren Suchbaum werden nacheinander 5, 2, 8, 1, 3 eingefügt. Welche Kinder hat die 2?', a:['links 1, rechts 3','links 3, rechts 1','nur rechts 8','keine'], e:'1 < 5 und 1 < 2 → links von 2. 3 < 5 und 3 > 2 → rechts von 2.'},
+    {d:2, q:'Wie viele Schritte braucht die Suche in einem gut ausgeglichenen Suchbaum mit n Knoten ungefähr?', a:['O(log n)','O(n)','O(1)','O(n²)'], e:'Mit jedem Schritt fällt etwa die Hälfte der übrigen Knoten weg – wie bei der binären Suche.'},
+    {d:3, q:'In welcher Reihenfolge werden die Knoten bei der Preorder-Traversierung besucht?' + BST, a:['8, 3, 1, 6, 4, 7, 10, 14, 13','1, 3, 4, 6, 7, 8, 10, 13, 14','1, 4, 7, 6, 3, 13, 14, 10, 8','8, 3, 10, 1, 6, 14, 4, 7, 13'], e:'Preorder = Knoten, links, rechts. Zuerst die Wurzel 8, dann der ganze linke Teilbaum.'},
+    {d:3, q:'In welcher Reihenfolge werden die Knoten bei der Postorder-Traversierung besucht?' + BST, a:['1, 4, 7, 6, 3, 13, 14, 10, 8','8, 3, 1, 6, 4, 7, 10, 14, 13','1, 3, 4, 6, 7, 8, 10, 13, 14','13, 14, 10, 7, 4, 6, 1, 3, 8'], e:'Postorder = links, rechts, Knoten. Die Wurzel kommt ganz zum Schluss.'},
+    {d:3, q:'Ist das ein binärer Suchbaum?' + C('      5', '     / \\', '    3   8', '   / \\', '  1   6'), a:['Nein – die 6 steht im linken Teilbaum der 5, ist aber größer.','Ja – jedes Kind passt zu seinem Elternknoten.','Nein – die 8 müsste links stehen.','Nein – die Wurzel muss der kleinste Wert sein.'], e:'6 > 3 passt zwar zum Elternknoten 3, aber alles links von 5 muss kleiner als 5 sein.'},
+    {d:3, q:'Man fügt 1, 2, 3, 4, 5 in dieser Reihenfolge in einen leeren Suchbaum ein. Was passiert?', a:['Jeder Knoten hängt rechts am vorigen – der Baum wird zur Liste, Suche kostet O(n).','Es entsteht ein ausgeglichener Baum mit Wurzel 3.','Die 5 wird die Wurzel.','Das Einfügen schlägt fehl.'], e:'Bei sortierter Eingabe „entartet“ der Baum. Deshalb kommt es auf die Einfügereihenfolge an.'},
+    {d:3, q:'Ein vollständig ausgeglichener Suchbaum hat 1023 Knoten (10 Ebenen). Wie viele Knoten muss man bei einer Suche höchstens anschauen?', a:['10','1023','512','100'], e:'Pro Ebene einen Knoten: 2¹⁰ − 1 = 1023, also 10 Ebenen.'},
+    {d:3, q:'Wozu dient die Zeile `if k is None`?' + C('def suche(k, x):', '    if k is None:', '        return False', '    if x == k.wert:', '        return True', '    if x < k.wert:', '        return suche(k.links, x)', '    return suche(k.rechts, x)'), a:['Abbruchbedingung: Der Teilbaum ist leer, x kommt nicht vor.','Sie prüft, ob x gefunden wurde.','Sie springt zurück zur Wurzel.','Sie ist überflüssig.'], e:'Ohne sie würde `k.wert` bei einem leeren Teilbaum einen Fehler auslösen.'},
+    {d:3, q:'Was berechnet diese Funktion für die Wurzel eines Binärbaums?' + C('def anzahl(k):', '    if k is None:', '        return 0', '    return 1 + anzahl(k.links) + anzahl(k.rechts)'), a:['Die Anzahl aller Knoten','Die Höhe des Baums','Die Anzahl der Blätter','Den größten Wert'], e:'Jeder Knoten zählt sich selbst (1) und lässt die beiden Teilbäume rekursiv zählen.'},
+    {d:3, q:'Ein Knoten mit zwei Kindern soll aus dem Suchbaum gelöscht werden. Welcher Wert kann seinen Platz einnehmen, ohne die Ordnung zu stören?', a:['Der kleinste Wert im rechten Teilbaum','Immer sein linkes Kind','Der Wert der Wurzel','Ein beliebiges Blatt'], e:'Er ist größer als alles links und kleiner als alles übrige rechts. (Genauso geht der größte Wert im linken Teilbaum.)'},
   ]
 }];
 // Reihenfolge in der Auswahl: Grundlagen → Sortieren → Datenstrukturen
