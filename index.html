@@ -36,6 +36,11 @@ p{margin:6px 0;line-height:1.4}
 .card{position:relative} .card .bn{position:absolute;top:4px;right:4px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;border-radius:8px;background:#0008;opacity:.75} .card .bn:hover{opacity:1;background:#7f1d1d}
 .kn{display:inline-block;min-width:20px;margin-right:6px;color:var(--mut);font-weight:700}
 .lbar{display:flex;height:16px;border-radius:8px;overflow:hidden;background:#1f2937;margin:6px 0} .lbar i{display:block} .lbar .g{background:#22c55e} .lbar .w{background:#f59e0b} .lbar .n{background:#475569}
+.focus{margin:10px 0;border:1px solid var(--line);border-radius:12px;padding:8px 12px;background:#0e1914} .focus summary{cursor:pointer;font-weight:700;padding:6px 0}
+#focusList{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border:2px solid var(--line);border-radius:999px;cursor:pointer;font-size:14px;min-height:40px;user-select:none} .chip.on{border-color:var(--acc);background:#2a2410} .chip input{accent-color:#fde047} .chip small{color:var(--mut)}
+#focusMode label{margin-right:14px;font-size:14px;cursor:pointer}
+.mini{background:#334155;color:var(--ink);border:0;border-radius:8px;padding:8px 12px;font:inherit;font-size:13px;cursor:pointer;margin:2px 4px 2px 0}
 .llg{font-size:13px;color:var(--mut)} .llg b{color:var(--ink)}
 .card.sel{border-color:var(--acc)} .card.off{opacity:.4;cursor:default}
 .card b{display:block;font-size:16px} .card small{color:var(--mut);display:block;margin-top:3px;line-height:1.3}
@@ -128,6 +133,14 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
   <div class="box sbox">
     <h2>Dein Spitzname</h2><input id="nick" maxlength="16" placeholder="z. B. Bitzauberer" autocomplete="off" spellcheck="false">
     <h2>Lernbereich</h2><div class="cards" id="selArea"></div>
+    <details id="focusBox" class="focus"><summary id="focusSum">🎯 Schwerpunkt wählen (optional)</summary>
+      <p class="hint">Wähle Themen aus diesem Lernbereich – dann kommen überwiegend oder nur Fragen dazu.</p>
+      <button class="mini" id="focusAll">Alle Themen</button><button class="mini" id="focusNone">Keine (alle Fragen)</button>
+      <div id="focusList"></div>
+      <div id="focusMode" style="display:none"><label><input type="radio" name="fm" value="nur"> nur diese Themen</label> <label><input type="radio" name="fm" value="meist"> überwiegend (4 von 5 Fragen)</label></div>
+      <div id="focusInfo" class="hint" style="margin:6px 0"></div>
+      <button class="mini" id="focusLink">🔗 Link für die Stunde kopieren</button>
+    </details>
     <h2>Klasse</h2><div class="cards" id="selClass"></div>
     <h2>Welten – nacheinander, je ca. 3 Min. + Endboss</h2><div class="cards" id="selMap"></div>
     <label class="chk"><input type="checkbox" id="tipsChk"> 💡 Tipps beim Spielen zeigen (kommen beim ersten Spiel automatisch)</label>
@@ -291,7 +304,7 @@ let W=0, H=0;
 function resize(){ const d=Math.min(devicePixelRatio||1, 2); W=innerWidth; H=innerHeight; cv.width=W*d; cv.height=H*d; cx.setTransform(d,0,0,d,0,0); }
 addEventListener('resize', resize); resize();
 
-const choice = {cls:CLASSES[0], area:LERNBEREICHE[0]};
+const choice = {cls:CLASSES[0], area:LERNBEREICHE[0], focus:new Set(), ft:new Set(), fmode:'nur'};
 let G = null, mode = 'menu';
 
 function newGame(){
@@ -302,7 +315,7 @@ function newGame(){
   const C=choice.cls; G.cls=C; p.maxHp=p.hp=C.hp; p.speed*=C.spd; R3.setLook(C.robe, C.hat);
   addWeapon(C.weapon); R3.setWorld(0);
   G.gold=prog.startGold||0; prog.startGold=0; saveProg();
-  const A=areaProg(choice.area.id); G.due=choice.area.fragen.filter(f=>A.box[qKey(f)]!==undefined && A.box[qKey(f)]<=prog.runs).sort(()=>Math.random()-.5);
+  const A=areaProg(choice.area.id); G.due=choice.area.fragen.filter(f=>A.box[qKey(f)]!==undefined && A.box[qKey(f)]<=prog.runs && (choice.fmode!=='nur'||inFocus(f))).sort(()=>Math.random()-.5);
   if(G.due.length) setTimeout(()=>toast(`🔁 ${G.due.length} Frage${G.due.length>1?'n':''} aus früheren Runden kommen wieder`),400);
 }
 const XPK = {sq:.35, cu:.05};
@@ -683,9 +696,13 @@ function pickQuestion(){
   const F=choice.area.fragen, due=G.review.findIndex(r=>r.due<=G.level);
   if(due>=0){ const r=G.review.splice(due,1)[0]; return {f:r.f, again:true}; }
   if(G.due && G.due.length){ const f=G.due.shift(); G.asked.add(f); return {f, again:true}; }
-  let pool=F.filter(f=>f.d===G.diff && !G.asked.has(f));
-  if(!pool.length){ F.filter(f=>f.d===G.diff).forEach(f=>G.asked.delete(f)); pool=F.filter(f=>f.d===G.diff); }
-  if(!pool.length) pool=F;
+  // Schwerpunkt: nur Fragen der gewählten Themen, oder überwiegend (4 von 5)
+  let L=F;
+  if(focusActive()){ const inn=F.filter(inFocus), out=F.filter(f=>!inFocus(f)); L = choice.fmode==='nur' || !out.length ? inn : (Math.random()<.8 && inn.length ? inn : out); }
+  let pool=L.filter(f=>f.d===G.diff && !G.asked.has(f));
+  if(!pool.length) pool=L.filter(f=>!G.asked.has(f));   // lieber eine ungestellte Frage anderer Stufe als eine Wiederholung
+  if(!pool.length){ L.forEach(f=>G.asked.delete(f)); pool=L.filter(f=>f.d===G.diff); }
+  if(!pool.length) pool=L;
   const f=pool[Math.floor(Math.random()*pool.length)]; G.asked.add(f); return {f, again:false};
 }
 const esc = s => s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -935,11 +952,40 @@ $('nick').addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter
 
 function selList(el, list, key){
   el.innerHTML=list.map((c,i)=>`<button class="card ${c.off?'off':''} ${choice[key]===c?'sel':''}" data-i="${i}"><div class="big">${c.icon}</div><b>${c.name}</b><small>${c.desc||c.stufe||''}</small></button>`).join('');
-  el.onclick=e=>{ const b=e.target.closest('.card'); if(!b) return; const c=list[+b.dataset.i]; if(c.off) return; choice[key]=c; selList(el,list,key); if(key==='area'){ renderBoard(); updHeftInfo(); } };
+  el.onclick=e=>{ const b=e.target.closest('.card'); if(!b) return; const c=list[+b.dataset.i]; if(c.off) return; choice[key]=c; selList(el,list,key); if(key==='area'){ setFocus([]); renderFocus(); renderBoard(); updHeftInfo(); } };
 }
 refreshClasses(); selList($('selClass'),CLASSES,'cls'); $('selMap').innerHTML=WORLDS.map((w,i)=>`<div class="card" style="cursor:default"><div class="big">${w.icon}</div><b>${i+1}. ${w.name}</b><small>${w.desc}</small></div>`).join('');
 LERNBEREICHE.forEach(a=>a.desc=a.stufe+' · '+a.fragen.length+' Fragen');
 selList($('selArea'),LERNBEREICHE,'area'); renderBoard(); updHeftInfo();
+// ---------- Schwerpunkt: Themen (= Kapitel im OPAL-Kurs) eines Lernbereichs auswählen ----------
+function themeKey(t,used){ let k=(t.match(/^(\d+(?:\.\d+)*[a-z]?)\s/)||[])[1] || t.toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24); while(used.has(k)) k+='x'; used.add(k); return k; }
+function themesOf(area){ if(area._th) return area._th; const m=new Map(), used=new Set();
+  for(const f of area.fragen){ const t=f.t||'Allgemein'; if(!m.has(t)) m.set(t,{key:themeKey(t,used),title:t,n:0}); m.get(t).n++; }
+  return area._th=[...m.values()]; }
+const focusActive = () => choice.ft.size>0;
+const inFocus = f => !choice.ft.size || choice.ft.has(f.t||'Allgemein');
+function setFocus(keys){ choice.focus=new Set(keys); choice.ft=new Set(themesOf(choice.area).filter(x=>choice.focus.has(x.key)).map(x=>x.title)); }
+function renderFocus(){
+  const area=choice.area, th=themesOf(area), act=focusActive(), n=area.fragen.filter(inFocus).length;
+  $('focusList').innerHTML=th.map(x=>`<label class="chip ${choice.focus.has(x.key)?'on':''}"><input type="checkbox" data-k="${x.key}" ${choice.focus.has(x.key)?'checked':''}>${esc(x.title)} <small>${x.n}</small></label>`).join('');
+  $('focusSum').textContent = act ? `🎯 Schwerpunkt: ${choice.focus.size} ${choice.focus.size>1?'Themen':'Thema'} · ${n} Fragen` : '🎯 Schwerpunkt wählen (optional) – sonst kommen alle Themen';
+  $('focusMode').style.display = act ? '' : 'none';
+  const r=document.querySelector(`#focusMode input[value="${choice.fmode}"]`); if(r) r.checked=true;
+  $('focusInfo').textContent = !act ? '' : choice.fmode==='nur' ? (n<20 ? `Nur ${n} Fragen zur Auswahl – in einer Runde wiederholen sich einige.` : 'Es kommen nur Fragen aus diesen Themen.') : 'Etwa 4 von 5 Fragen kommen aus diesen Themen, der Rest aus dem ganzen Bereich.';
+}
+$('focusList').onchange=e=>{ const c=e.target.closest('input[data-k]'); if(!c) return; const s=new Set(choice.focus); c.checked?s.add(c.dataset.k):s.delete(c.dataset.k); setFocus([...s]); renderFocus(); };
+$('focusAll').onclick=()=>{ setFocus(themesOf(choice.area).map(x=>x.key)); renderFocus(); };
+$('focusNone').onclick=()=>{ setFocus([]); renderFocus(); };
+document.querySelectorAll('#focusMode input').forEach(r=>r.onchange=()=>{ choice.fmode=r.value; renderFocus(); });
+$('focusLink').onclick=()=>{ let u=location.origin+location.pathname+'?bereich='+choice.area.id; if(focusActive()) u+='&themen='+[...choice.focus].join(',')+'&modus='+choice.fmode;
+  const done=()=>{ $('focusInfo').textContent='🔗 Link kopiert – so öffnet er genau diesen Bereich'+(focusActive()?' mit diesem Schwerpunkt':'')+'.'; };
+  (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(done).catch(()=>prompt('Link kopieren:',u)); };
+// Link der Lehrkraft: ?bereich=algo&themen=2.2.3,2.2.4&modus=nur|meist
+(function(){ const q=new URLSearchParams(location.search), a=LERNBEREICHE.find(x=>x.id===q.get('bereich')); if(!a) return;
+  choice.area=a; selList($('selArea'),LERNBEREICHE,'area'); const ks=(q.get('themen')||'').split(',').filter(Boolean);
+  setFocus(themesOf(a).filter(x=>ks.includes(x.key)).map(x=>x.key)); if(q.get('modus')==='meist') choice.fmode='meist';
+  if(focusActive()) $('focusBox').open=true; renderBoard(); updHeftInfo(); })();
+renderFocus();
 $('startBtn').onclick=start; $('againBtn').onclick=start;
 $('menuBtn').onclick=()=>{ G=null; mode='menu'; renderBoard(); updHeftInfo(); show('ovStart'); };
 $('quitBtn').onclick=()=>{ if(G) gameOver(false); };
