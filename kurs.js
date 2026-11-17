@@ -20,6 +20,7 @@ window.FAECHER = [
 window.LERNBEREICHE = [
   {id: 'python',     fach: 'informatik', icon: '🐍', name: 'Python-Grundlagen'},
   {id: 'algo',       fach: 'informatik', icon: '📊', name: 'Algorithmen & Komplexität'},
+  {id: 'rekursion',  fach: 'informatik', icon: '🔁', name: 'Rekursion'},
   {id: 'daten',      fach: 'informatik', icon: '🧱', name: 'Datenstrukturen'},
   {id: 'ki',         fach: 'informatik', icon: '🤖', name: 'Künstliche Intelligenz'},
   {id: 'technik',    fach: 'informatik', icon: '🔦', name: 'Technische Informatik'},

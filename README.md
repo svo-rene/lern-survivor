@@ -23,6 +23,8 @@ Je Lernbereich eine Datei `kurs/<id>.js`, die Liste der Bereiche steht in [`kurs
 - `d` Schwierigkeit 1–3 (das Spiel passt sie an die Trefferquote an)
 - `a` vier Antworten – **die erste ist die richtige**, das Spiel mischt sie
 - `e` kurze Erklärung, die nach der Antwort erscheint; `src` Quelle (OPAL-Seite oder Lehrplan)
+- **Bilder:** `plot: {x: [0, 10], y: [0, 100], curves: [{f: function(n) { return n * n; }, label: 'A'}]}` zeichnet ein Diagramm aus Funktionen (auch `points`, `xl`, `yl`), `svg: '<svg …>'` ein selbst gezeichnetes SVG, `img: 'img/x.svg'` eine Datei; dazu `alt` als Beschreibung. Auch Antworten dürfen Bilder sein: `{plot: {…, mini: true}, alt: 'Parabel'}` statt Text (die erste Antwort bleibt die richtige).
+- **Themen:** Jede Frage trägt `t:` (Kapitel/Thema im Kurs). Daraus entsteht die Schwerpunkt-Auswahl; ein Link wie `?bereich=algo&themen=2.2.2,2.2.5&modus=nur` wählt Bereich und Themen vor.
 - Mehrzeiliger Code: `'
 `zeile 1
 zeile 2`'`

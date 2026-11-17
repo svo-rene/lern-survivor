@@ -35,6 +35,10 @@ p{margin:6px 0;line-height:1.4}
 .card{background:#0e1914;border:2px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;color:var(--ink);text-align:left;font:inherit}
 .card{position:relative} .card .bn{position:absolute;top:4px;right:4px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;border-radius:8px;background:#0008;opacity:.75} .card .bn:hover{opacity:1;background:#7f1d1d}
 .kn{display:inline-block;min-width:20px;margin-right:6px;color:var(--mut);font-weight:700}
+.qmedia{margin:8px 0;text-align:center} .qmedia svg,.qmedia img{display:block;margin:0 auto;max-width:100%;height:auto;background:#0b1410;border:1px solid var(--line);border-radius:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px} .grid2 .ans{margin:0}
+#qans.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px} #qans.grid .ans{margin:0}
+.ans.media{padding:6px;text-align:center;position:relative} .ans.media .qmedia{margin:0} .ans.media .kn{position:absolute;top:6px;left:8px;margin:0;z-index:1}
 .lbar{display:flex;height:16px;border-radius:8px;overflow:hidden;background:#1f2937;margin:6px 0} .lbar i{display:block} .lbar .g{background:#22c55e} .lbar .w{background:#f59e0b} .lbar .n{background:#475569}
 .focus{margin:10px 0;border:1px solid var(--line);border-radius:12px;padding:8px 12px;background:#0e1914} .focus summary{cursor:pointer;font-weight:700;padding:6px 0}
 #focusList{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
@@ -138,8 +142,9 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
     <div id="fachBox"><h2>Fach</h2><div class="cards" id="selFach"></div></div>
     <h2>Lernbereich</h2><div class="cards" id="selArea"></div>
     <details id="focusBox" class="focus"><summary id="focusSum">🎯 Schwerpunkt wählen (optional)</summary>
-      <p class="hint">Wähle Themen aus diesem Lernbereich – dann kommen überwiegend oder nur Fragen dazu.</p>
+      <p class="hint">Wähle Themen aus diesem Lernbereich – dann kommen überwiegend oder nur Fragen dazu. Mit „Stoff bis Kapitel“ wählst du alles bis zu dem Kapitel, das ihr im Kurs gerade behandelt habt.</p>
       <button class="mini" id="focusAll">Alle Themen</button><button class="mini" id="focusNone">Keine (alle Fragen)</button>
+      <select id="focusUpTo" class="mini" aria-label="Stoff bis Kapitel"></select>
       <div id="focusList"></div>
       <div id="focusMode" style="display:none"><label><input type="radio" name="fm" value="nur"> nur diese Themen</label> <label><input type="radio" name="fm" value="meist"> überwiegend (4 von 5 Fragen)</label></div>
       <div id="focusInfo" class="hint" style="margin:6px 0"></div>
@@ -213,9 +218,9 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
 </div></div>
 <button id="dashBtn" aria-label="Ausweichen">💨</button>
 
-<script src="kurs/python.js"></script><script src="kurs/algo.js"></script><script src="kurs/daten.js"></script><script src="kurs/ki.js"></script><script src="kurs/technik.js"></script><script src="kurs/oop.js"></script><script src="kurs/netze.js"></script><script src="kurs/automaten.js"></script><script src="kurs/datenbank.js"></script><script src="kurs/sicherheit.js"></script><script src="kurs/kraefte.js"></script>
+<script src="kurs/python.js"></script><script src="kurs/algo.js"></script><script src="kurs/rekursion.js"></script><script src="kurs/daten.js"></script><script src="kurs/ki.js"></script><script src="kurs/technik.js"></script><script src="kurs/oop.js"></script><script src="kurs/netze.js"></script><script src="kurs/automaten.js"></script><script src="kurs/datenbank.js"></script><script src="kurs/sicherheit.js"></script><script src="kurs/kraefte.js"></script>
 <script src="kurs.js"></script>
-<script src="heft/python.js"></script><script src="heft/algo.js"></script><script src="heft/daten.js"></script>
+<script src="heft/python.js"></script><script src="heft/algo.js"></script><script src="heft/rekursion.js"></script><script src="heft/daten.js"></script>
 <script src="heft/ki.js"></script><script src="heft/technik.js"></script><script src="heft/oop.js"></script><script src="heft/netze.js"></script>
 <script src="heft/automaten.js"></script><script src="heft/datenbank.js"></script><script src="heft/sicherheit.js"></script><script src="heft/kraefte.js"></script>
 <script src="vendor/three.min.js"></script>
@@ -728,6 +733,37 @@ const fmtMath = s => s.replace(/\$([^$\n]+)\$/g,(m,f)=>f.replace(/_\{([^}]*)\}|_
   .replace(/\{\{([^{}|]+)\|([^{}]+)\}\}/g,'<span class="frac"><span>$1</span><span>$2</span></span>');
 const fmt = s => esc(s).split(/(`[^`]+`)/).map(p=>p.length>1&&p[0]==='`'&&p.endsWith('`')
   ? (c=>c.includes('\n')?`<pre class="code">${c}</pre>`:`<code>${c}</code>`)(p.slice(1,-1)) : fmtMath(p)).join('');
+// ---------- Bilder in Fragen und Antworten ----------
+// Frage: img: 'img/x.svg' (Datei) | svg: '<svg…>' (selbst gezeichnet) | plot: {…} (Diagramm aus Funktionen), dazu alt: 'Beschreibung'
+// Antwort: statt Text ein Objekt {plot|svg|img: …, alt: '…'}; die erste Antwort ist wie immer die richtige
+// plot: {x:[x0,x1], y:[y0,y1], curves:[{f:function(x){…}, label:'A', color:'#…', dash:true}], points:[{x,y}], xl:'n', yl:'Schritte', xt:[…], yt:[…], mini:true, w:320, h:200}
+let plotN=0;
+function plotSvg(sp){
+  const id=++plotN, mini=!!sp.mini, W=sp.w||(mini?200:320), H=sp.h||(mini?130:200), L=mini?10:42, R=14, T=mini?8:16, B=mini?10:30, pw=W-L-R, ph=H-T-B, x0=sp.x[0], x1=sp.x[1], y0=sp.y[0], y1=sp.y[1];
+  const X=x=>L+(x-x0)/(x1-x0)*pw, Y=y=>T+ph-(y-y0)/(y1-y0)*ph, num=v=>String(Math.round(v*100)/100).replace('.',',');
+  const ticks=(a,b)=>[0,1,2,3,4].map(i=>a+(b-a)*i/4), xt=sp.xt||ticks(x0,x1), yt=sp.yt||ticks(y0,y1), COL=['#fde047','#38bdf8','#f87171','#4ade80','#c084fc'];
+  let o=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${esc(sp.alt||'Diagramm')}" font-family="system-ui,sans-serif" font-size="11"><defs><clipPath id="cp${id}"><rect x="${L}" y="${T}" width="${pw}" height="${ph}"/></clipPath></defs>`;
+  if(!mini){ for(const v of xt) o+=`<line x1="${X(v)}" y1="${T}" x2="${X(v)}" y2="${T+ph}" stroke="#1f2937"/><text x="${X(v)}" y="${T+ph+14}" fill="#9ca3af" text-anchor="middle">${num(v)}</text>`;
+    for(const v of yt) o+=`<line x1="${L}" y1="${Y(v)}" x2="${L+pw}" y2="${Y(v)}" stroke="#1f2937"/><text x="${L-5}" y="${Y(v)+4}" fill="#9ca3af" text-anchor="end">${num(v)}</text>`; }
+  o+=`<line x1="${L}" y1="${T+ph}" x2="${L+pw}" y2="${T+ph}" stroke="#9ca3af" stroke-width="1.5"/><line x1="${L}" y1="${T}" x2="${L}" y2="${T+ph}" stroke="#9ca3af" stroke-width="1.5"/>`;
+  if(sp.xl) o+=`<text x="${L+pw}" y="${H-3}" fill="#cbd5e1" text-anchor="end">${esc(sp.xl)}</text>`;
+  if(sp.yl) o+=`<text x="${L+4}" y="${T-4}" fill="#cbd5e1">${esc(sp.yl)}</text>`;
+  (sp.curves||[]).forEach((c,k)=>{ const col=c.color||COL[k%COL.length]; let d='', last=null;
+    for(let i=0;i<=160;i++){ const x=x0+(x1-x0)*i/160, y=c.f(x); if(!isFinite(y)) continue; d+=(d?'L':'M')+X(x).toFixed(1)+' '+Y(y).toFixed(1); if(y>=y0&&y<=y1) last=[x,y]; }
+    o+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" ${c.dash?'stroke-dasharray="6 4"':''} clip-path="url(#cp${id})"/>`;
+    if(c.label&&last) o+=`<text x="${Math.min(X(last[0])-4,L+pw-4)}" y="${Math.max(T+11,Y(last[1])-6)}" fill="${col}" font-weight="700" text-anchor="end" font-size="13">${esc(c.label)}</text>`; });
+  for(const pt of (sp.points||[])) o+=`<circle cx="${X(pt.x)}" cy="${Y(pt.y)}" r="4" fill="${pt.color||'#fde047'}"/>`;
+  return o+'</svg>';
+}
+function mediaHtml(m){
+  if(!m) return '';
+  if(m.plot) return `<div class="qmedia">${plotSvg(Object.assign({alt:m.alt},m.plot))}</div>`;
+  if(m.svg) return `<div class="qmedia">${m.svg}</div>`;
+  if(m.img) return `<div class="qmedia"><img src="${esc(m.img)}" alt="${esc(m.alt||'')}"></div>`;
+  return '';
+}
+const qMedia = f => (f.plot||f.svg||f.img) ? mediaHtml({plot:f.plot, svg:f.svg, img:f.img, alt:f.alt}) : '';
+const ansHtml = t => typeof t==='object' ? mediaHtml(t) : fmt(t);
 let Q=null;
 function openQuiz(){
   mode='quiz'; joy=null; const {f,again}=pickQuestion();
@@ -738,8 +774,9 @@ function openQuiz(){
   G.rerollQ=false;
   $('qinfo').textContent=(G.chestMode?'📦 Kiste · ':'')+(again?'🔁 Wiederholung · ':'')+'Stufe '+'★'.repeat(f.d)+'☆'.repeat(3-f.d);
   $('qluck').textContent=(G.streak?'🔥 Streak '+G.streak+' · ':'')+'⚡ schnell = mehr Glück';
-  $('qtext').innerHTML=fmt(f.q);
-  $('qans').innerHTML=opts.map((o,i)=>`<button class="ans" data-i="${i}"><span class="kn">${i+1}</span>${fmt(o.t)}</button>`).join('');
+  $('qtext').innerHTML=fmt(f.q)+qMedia(f);
+  $('qans').classList.toggle('grid', opts.some(o=>typeof o.t==='object'));
+  $('qans').innerHTML=opts.map((o,i)=>`<button class="ans ${typeof o.t==='object'?'media':''}" data-i="${i}"><span class="kn">${i+1}</span>${ansHtml(o.t)}</button>`).join('');
   $('qans').classList.add('wait'); $('qRead').style.display='block'; $('bonus').classList.add('read');
   $('box_q').classList.remove('win','lose');
   $('fb').style.display='none'; $('qNext').style.display='none';
@@ -852,7 +889,7 @@ function gameOver(win){
   $('overStats').innerHTML=`<div>⏱ ${fmtT(s)}</div><div>${WORLDS[G.world].icon} Welt ${G.world+1}/3</div><div>⬆️ Level ${G.level}</div><div>💥 ${G.kills} besiegt</div><div>✔ ${ok}/${G.hist.length} richtig</div><div>🔥 bester Streak ${G.best}</div><div>★ erreicht ${'★'.repeat(G.diff)}</div>`;
   const D=Object.entries(G.dmgBy).filter(([k])=>WEAPONS[k]||k==='dornen').sort((x,y)=>y[1]-x[1]), mx=D.length?D[0][1]:1;
   $('overDmg').innerHTML=D.map(([k,v])=>{ const W_=WEAPONS[k]||{icon:'🌵',name:'Dornenmantel'}; return `<div class="dmgrow"><b>${W_.icon} ${W_.name}</b><i style="width:${Math.max(3,v/mx*100)}%"></i><span>${Math.round(v).toLocaleString('de-DE')}</span></div>`; }).join('')||'<p class="hint">–</p>';
-  $('overWrong').innerHTML=G.wrongs.length?G.wrongs.map(f=>`<div class="wrong"><b>${fmt(f.q)}</b><br>✔ ${fmt(f.a[0])}<br><span style="color:var(--mut)">${fmt(f.e)}</span></div>`).join(''):'<p>Nichts – alles richtig! 🎉</p>';
+  $('overWrong').innerHTML=G.wrongs.length?G.wrongs.map(f=>`<div class="wrong"><b>${fmt(f.q)}</b>${qMedia(f)}✔ ${ansHtml(f.a[0])}<br><span style="color:var(--mut)">${fmt(f.e)}</span></div>`).join(''):'<p>Nichts – alles richtig! 🎉</p>';
   retryInit(); $('overLearn').innerHTML=learnHtml(choice.area.id)+'<p class="hint">Beim nächsten Start kommen deine wackeligen Fragen zuerst dran.</p>';
   show('ovOver');
 }
@@ -867,8 +904,8 @@ function retryInit(){
 function retryShow(){
   if(RT.i>=RT.list.length){ $('overLearn').innerHTML=learnHtml(choice.area.id); $('overRetry').innerHTML=`<p><b>${RT.ok} von ${RT.list.length} richtig.</b> ${RT.ok?`Nächste Runde startest du mit ${prog.startGold} 🪙.`:''}</p>`; $('overWrong').style.display=''; return; }
   const f=RT.list[RT.i], opts=f.a.map((t,i)=>({t,ok:i===0})).sort(()=>Math.random()-.5);
-  $('overRetry').innerHTML=`<div class="retry"><p class="hint">Frage ${RT.i+1} von ${RT.list.length}</p><div style="font-weight:700;margin:4px 0 8px">${fmt(f.q)}</div>`+
-    opts.map((o,i)=>`<button class="ans" data-i="${i}">${fmt(o.t)}</button>`).join('')+`<div id="rtFb"></div></div>`;
+  $('overRetry').innerHTML=`<div class="retry"><p class="hint">Frage ${RT.i+1} von ${RT.list.length}</p><div style="font-weight:700;margin:4px 0 8px">${fmt(f.q)}</div>${qMedia(f)}`+
+    `<div class="${opts.some(o=>typeof o.t==='object')?'grid2':''}">`+opts.map((o,i)=>`<button class="ans ${typeof o.t==='object'?'media':''}" data-i="${i}">${ansHtml(o.t)}</button>`).join('')+`</div><div id="rtFb"></div></div>`;
   $('overRetry').querySelectorAll('.ans').forEach(b=>b.onclick=()=>{
     if(RT.done) return; RT.done=true; const o=opts[+b.dataset.i];
     $('overRetry').querySelectorAll('.ans').forEach((x,i)=>{ if(opts[i].ok) x.classList.add('ok'); }); if(!o.ok) b.classList.add('bad');
@@ -1003,12 +1040,14 @@ function setFocus(keys){ choice.focus=new Set(keys); choice.ft=new Set(themesOf(
 function renderFocus(){
   const area=choice.area, th=themesOf(area), act=focusActive(), n=area.fragen.filter(inFocus).length;
   $('focusList').innerHTML=th.map(x=>`<label class="chip ${choice.focus.has(x.key)?'on':''}"><input type="checkbox" data-k="${x.key}" ${choice.focus.has(x.key)?'checked':''}>${esc(x.title)} <small>${x.n}</small></label>`).join('');
+  $('focusUpTo').innerHTML='<option value="">📅 Stoff bis Kapitel …</option>'+th.map((x,i)=>`<option value="${i}">${esc(x.title)}</option>`).join('');
   $('focusSum').textContent = act ? `🎯 Schwerpunkt: ${choice.focus.size} ${choice.focus.size>1?'Themen':'Thema'} · ${n} Fragen` : '🎯 Schwerpunkt wählen (optional) – sonst kommen alle Themen';
   $('focusMode').style.display = act ? '' : 'none';
   const r=document.querySelector(`#focusMode input[value="${choice.fmode}"]`); if(r) r.checked=true;
   $('focusInfo').textContent = !act ? '' : choice.fmode==='nur' ? (n<20 ? `Nur ${n} Fragen zur Auswahl – in einer Runde wiederholen sich einige.` : 'Es kommen nur Fragen aus diesen Themen.') : 'Etwa 4 von 5 Fragen kommen aus diesen Themen, der Rest aus dem ganzen Bereich.';
 }
 $('focusList').onchange=e=>{ const c=e.target.closest('input[data-k]'); if(!c) return; const s=new Set(choice.focus); c.checked?s.add(c.dataset.k):s.delete(c.dataset.k); setFocus([...s]); renderFocus(); };
+$('focusUpTo').onchange=e=>{ const i=e.target.value; if(i==='') return; setFocus(themesOf(choice.area).slice(0,+i+1).map(x=>x.key)); renderFocus(); };
 $('focusAll').onclick=()=>{ setFocus(themesOf(choice.area).map(x=>x.key)); renderFocus(); };
 $('focusNone').onclick=()=>{ setFocus([]); renderFocus(); };
 document.querySelectorAll('#focusMode input').forEach(r=>r.onchange=()=>{ choice.fmode=r.value; renderFocus(); });

@@ -14,9 +14,10 @@ var n = F.length, i, j, longest = 0, byD = {1: [0, 0], 2: [0, 0], 3: [0, 0]}, ba
 for (i = 0; i < n; i++) {
   var f = F[i], a = f.a, L = [], mx = 0, cnt = 0, sumW = 0;
   if (!f.q || !f.e || !f.src || !f.d || !a || a.length !== 4) { problems.push('#' + i + ' Feld fehlt oder nicht 4 Antworten'); continue; }
-  for (j = 0; j < 4; j++) { L[j] = String(a[j]).length; if (L[j] > mx) mx = L[j]; }
+  function txt(x) { return (typeof x === 'object') ? 'BILD:' + x.alt : String(x); }
+  for (j = 0; j < 4; j++) { L[j] = txt(a[j]).length; if (L[j] > mx) mx = L[j]; }
   for (j = 0; j < 4; j++) { if (L[j] === mx) cnt++; if (j > 0) sumW += L[j]; }
-  for (j = 1; j < 4; j++) if (String(a[j]) === String(a[0])) problems.push('#' + i + ' doppelte Antwort');
+  for (j = 1; j < 4; j++) if (txt(a[j]) === txt(a[0])) problems.push('#' + i + ' doppelte Antwort');
   var isLong = (L[0] === mx && cnt === 1), ratio = L[0] / (sumW / 3);
   byD[f.d][0]++;
   if (isLong) { longest++; byD[f.d][1]++; if (ratio > 1.15) bad.push('#' + i + ' (d' + f.d + ', richtig ' + L[0] + ' Zeichen, falsche im Schnitt ' + Math.round(sumW / 3) + '): ' + String(f.q).replace(/\n/g, ' ').substring(0, 70)); }
