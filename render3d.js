@@ -97,19 +97,25 @@ const R3 = (() => {
 
     // Waffen & Effekte
     inst('fire', new THREE.SphereGeometry(1, 8, 6), basic('#fff'), 300);
-    inst('arrow', new THREE.BoxGeometry(2.5, 2.5, 18), basic('#fff'), 250);
+    inst('arrow', new THREE.ConeGeometry(3.2, 22, 6).rotateX(Math.PI / 2), basic('#fff'), 250);   // Pfeilspitze zeigt nach +Z
     inst('blade', new THREE.TorusGeometry(1, .22, 4, 10).rotateX(Math.PI / 2), lam('#fff'), 40);
     inst('frost', new THREE.OctahedronGeometry(1, 0), basic('#bae6fd'), 40);
     inst('gem', new THREE.LatheGeometry([[0, -6.5], [4.6, -.6], [3.4, 1.6], [0, 2.2]].map(([x, y]) => new THREE.Vector2(x, y)), 8), lam('#fff', {emissive: '#1e293b'}), 450);   // geschliffener Stein
     inst('coin', new THREE.LatheGeometry([[0, -.8], [4.4, -.8], [4.8, -1.3], [6.2, -1.2], [6.5, 0], [6.2, 1.2], [4.8, 1.3], [4.4, .8], [0, .8]].map(([x, y]) => new THREE.Vector2(x, y)), 22).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({color: '#fbbf24', emissive: '#7c3a07'}), 200);   // Münze mit Rand
-    inst('chest', new THREE.BoxGeometry(34, 22, 24).translate(0, 11, 0), lam('#92400e'), 8);
-    inst('lid', new THREE.CylinderGeometry(12, 12, 34, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).translate(0, 22, 0), lam('#b45309'), 8);
-    inst('band', new THREE.BoxGeometry(36, 4, 26).translate(0, 17, 0), lam('#fbbf24', {emissive: '#713f12'}), 8);
+    inst('chest', new THREE.BoxGeometry(34, 22, 24).translate(0, 11, 0), lam('#92400e'), 16);   // je Welt 10 Kisten + Gratis-Kiste
+    inst('lid', new THREE.CylinderGeometry(12, 12, 34, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).translate(0, 22, 0), lam('#b45309'), 16);   // je Welt 10 Kisten + Gratis-Kiste
+    inst('band', new THREE.BoxGeometry(36, 4, 26).translate(0, 17, 0), lam('#fbbf24', {emissive: '#713f12'}), 16);   // je Welt 10 Kisten + Gratis-Kiste
     inst('pool', new THREE.CylinderGeometry(1, 1, 1, 20), basic('#84cc16', {transparent: true, opacity: .35, depthWrite: false}), 40);
     inst('fx', new THREE.SphereGeometry(1, 12, 8), basic('#fff', {transparent: true, opacity: .45, depthWrite: false}), 120);
     inst('meteor', new THREE.DodecahedronGeometry(1, 0), lam('#78350f', {emissive: '#7c2d12'}), 20);
     inst('mark', new THREE.RingGeometry(.92, 1, 32).rotateX(-Math.PI / 2), basic('#f97316', {transparent: true, opacity: .7, depthWrite: false}), 20);
 
+    // Leuchten: weiche Kreis-Textur, additiv; Partikel (Funken, Flammenschweif) nur zur Optik
+    const glc = document.createElement('canvas'); glc.width = glc.height = 64; const gx = glc.getContext('2d'), gr = gx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, '#fff'); gr.addColorStop(.25, 'rgba(255,255,255,.75)'); gr.addColorStop(.6, 'rgba(255,255,255,.18)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    gx.fillStyle = gr; gx.fillRect(0, 0, 64, 64);
+    inst('glow', new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({map: new THREE.CanvasTexture(glc), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false}), 1400);
+    inst('wave', new THREE.RingGeometry(.8, 1, 40).rotateX(-Math.PI / 2), basic('#fff', {transparent: true, depthWrite: false, blending: THREE.AdditiveBlending}), 120);
     // Schwerthiebe: Kreisausschnitte, Geometrie je Öffnungswinkel zwischengespeichert
     for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(undefined, basic('#f1f5f9', {transparent: true, opacity: .6, depthWrite: false, side: THREE.DoubleSide})); m.visible = false; scene.add(m); slashPool.push(m); }
     shield = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), basic('#67e8f9', {transparent: true, opacity: .2, depthWrite: false}));
@@ -256,6 +262,44 @@ const R3 = (() => {
     for (const k in n) done(I[k], n[k]);
   }
 
+  // ---- Effekte: Partikel leben nur in der Darstellung ----
+  const PT = [], seenFx = new WeakSet(), lastFlash = new WeakMap(); let fxT = 0;
+  const GLOW_RX = -.64;   // Leuchtflächen schauen zur Kamera
+  function emit(x, y, z, vx, vy, vz, life, size, col) { if (PT.length < 700) PT.push({x, y, z, vx, vy, vz, life, max: life, size, c: new THREE.Color(col)}); }
+  function burst(x, y, z, n, sp, col, size = 9, life = .45) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, v = sp * (.4 + Math.random() * .6); emit(x, y, z, Math.cos(a) * v, 30 + Math.random() * 80, Math.sin(a) * v, life * (.6 + Math.random() * .6), size, col); } }
+  function effects(G, t) {
+    const dt = Math.min(.1, Math.max(0, G.t - fxT)); fxT = G.t;
+    const g = I.glow; let n = 0;
+    const glow = (x, y, z, s, col, k = 1) => { if (n >= 1400) return; put(g, n, x, y, z, s, s, s, 0, GLOW_RX); g.setColorAt(n++, C.set(col).multiplyScalar(k)); };
+    if (dt > 0) for (const s of G.shots) {
+      if (s.kind === 'pfeil') emit(s.x, 18, s.y, 0, 0, 0, .22, 10, s.crit ? '#fde047' : '#67e8f9');
+      else if (s.kind === 'klinge') emit(s.x, 18, s.y, 0, 0, 0, .18, 14, '#e5e7eb');
+      else { emit(s.x + (Math.random() - .5) * 6, 22, s.y + (Math.random() - .5) * 6, -s.vx * .08, 20 + Math.random() * 30, -s.vy * .08, .35, 16, s.crit ? '#fde047' : '#fb923c');
+        if (Math.random() < .5) emit(s.x, 22, s.y, (Math.random() - .5) * 60, 40, (Math.random() - .5) * 60, .25, 7, '#fde68a'); }
+    }
+    if (dt > 0) for (const m of G.meteors) { const k = m.t / m.max; emit(m.x + 120 * k + (Math.random() - .5) * 14, 12 + 420 * k, m.y - 60 * k, 0, 30, 0, .4, 26, '#f97316'); }
+    if (dt > 0) for (const o of G.pools) if (Math.random() < dt * o.R / 18) { const a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * o.R; emit(o.x + Math.cos(a) * r, 3, o.y + Math.sin(a) * r, 0, 25, 0, .6, 8, '#a3e635'); }
+    for (const f of G.fx) if (!seenFx.has(f)) { seenFx.add(f); burst(f.x, 14, f.y, Math.min(18, 6 + f.r / 6), f.r * 2.2, f.col, 10); }
+    if (dt > 0) for (const e of G.en) { const lf = lastFlash.get(e) || 0; if (e.flash > lf + .01) burst(e.x, e.r, e.y, 4, 110, '#fde68a', 6, .25); lastFlash.set(e, e.flash); }
+    // Partikel bewegen und zeichnen
+    for (const p of PT) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vy -= 60 * dt; p.vx *= .96; p.vz *= .96; }
+    for (let i = PT.length - 1; i >= 0; i--) if (PT[i].life <= 0) PT.splice(i, 1);
+    for (const p of PT) { const k = p.life / p.max; if (n < 1400) { put(g, n, p.x, p.y, p.z, p.size * (.4 + .6 * k), p.size * (.4 + .6 * k), 1, 0, GLOW_RX); g.setColorAt(n++, C.copy(p.c).multiplyScalar(k)); } }
+    // feste Leuchtpunkte
+    for (const s of G.shots) {
+      if (s.kind === 'pfeil') glow(s.x, 18, s.y, 26, s.crit ? '#fde047' : '#22d3ee', .9);
+      else if (s.kind === 'klinge') glow(s.x, 18, s.y, s.r * 3, '#cbd5e1', .6);
+      else { glow(s.x, 22, s.y, s.r * 7, s.crit ? '#fde047' : '#f97316'); glow(s.x, 22, s.y, s.r * 2.6, '#fff7d6'); }
+    }
+    for (const m of G.meteors) { const k = m.t / m.max; glow(m.x + 120 * k, 12 + 420 * k, m.y - 60 * k, 90, '#fb923c'); glow(m.x, 3, m.y, m.R * 1.4, '#f97316', .25 + .5 * (1 - k)); }
+    for (const s of (G.eshots || [])) glow(s.x, 16, s.y, s.r * 4.5, s.col || '#f43f5e', .8);
+    for (const b of G.bolts) for (const q of b.pts) glow(q.x, 22, q.y, 46, '#7dd3fc', b.life / .18);
+    const fw = G.p.w && G.p.w.frost; if (fw && fw.pts) for (const q of fw.pts) glow(q.x, 20, q.y, 34, '#7dd3fc', .7);
+    let nw = 0; for (const f of G.fx) { const k = f.life / f.max; glow(f.x, 14, f.y, f.r * (1.4 + (1 - k)), f.col, k * .9);
+      if (nw < 120) { put(I.wave, nw, f.x, 2, f.y, f.r * (.3 + 1.1 * (1 - k)), 1, f.r * (.3 + 1.1 * (1 - k))); I.wave.setColorAt(nw++, C.set(f.col).multiplyScalar(k)); } }
+    done(I.wave, nw); done(g, n);
+  }
+
   const FOE_COL = {bug: '#ef4444', glitch: '#e879f9', lock: '#94a3b8', boss: '#dc2626', abi: '#a78bfa', spam: '#facc15', fork: '#4ade80', over: '#fb923c', tutor: '#f59e0b'};
   function render(G, W, H) {
     if (W !== lastW || H !== lastH) { ren.setSize(W, H, false); cam.aspect = W / H; cam.updateProjectionMatrix(); lastW = W; lastH = H; }
@@ -335,6 +379,7 @@ const R3 = (() => {
     let nm = 0; for (const m of G.meteors) { const k = m.t / m.max; put(I.meteor, nm, m.x + 120 * k, 12 + 420 * k, m.y - 60 * k, 14, 14, 14, t * 5); put(I.mark, nm++, m.x, 1.5, m.y, m.R); }
     done(I.meteor, nm); done(I.mark, nm);
     done(I.shadow, sh);
+    effects(G, t);
 
     const sl = G.slashes || [];
     slashPool.forEach((m, i) => {
