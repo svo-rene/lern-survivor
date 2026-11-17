@@ -13,6 +13,14 @@ STIL = 'cute stylized low poly game asset, chibi proportions, bright friendly co
 MODELLE = {
     'held': 'a young wizard in a purple robe and a tall pointy purple hat, holding a wooden staff with a glowing blue crystal on top',
     'bug':  'a round red ladybug beetle creature with big friendly eyes and six short legs',
+    'glitch': 'a small floating ghost creature, light purple, with a mischievous grin and little arms',
+    'lock': 'a chunky grey rock golem creature with a grumpy face and short stubby legs',
+    'spam': 'a yellow mushroom creature with a big round mouth spitting spores, tiny feet',
+    'fork': 'a green slime blob creature with big eyes and a happy face',
+    'over': 'an orange hedgehog creature with a spiky back, ready to roll',
+    'boss': 'a big grumpy living spellbook monster standing on its pages, with big eyes and a bookmark tongue',
+    'tutor': 'a big ink bottle monster with ink splash arms and a quill pen stuck on top, funny face',
+    'abi': 'a chubby purple dragon wearing a black graduation cap, small wings, proud smile',
 }
 POLY = 4000      # Dreiecke je Modell (viele Gegner gleichzeitig, auch auf Tablets)
 TEX = 512        # Kantenlänge der Textur in Pixeln

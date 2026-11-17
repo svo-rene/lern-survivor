@@ -109,6 +109,7 @@ const R3 = (() => {
   // 3D-Modelle aus modelle/*.glb (von tools/meshy.py). Fehlt eine Datei, bleiben die einfachen Formen.
   // Kleiner GLB-Leser: erstes Dreiecksnetz, Position/Normale/UV, Farbtextur. Modell wird auf Höhe 1 gebracht, Fuß auf y = 0.
   const MOD = {};
+  const FOE_K = {bug: 1.6, glitch: 1.6, lock: 1.3, spam: 1.5, fork: 1.5, over: 1.5, boss: 1.3, tutor: 1.3, abi: 1.3};   // Modellgröße × Radius
   async function loadGlb(url) {
     const r = await fetch(url); if (!r.ok) return null;
     const buf = await r.arrayBuffer(), dv = new DataView(buf);
@@ -139,30 +140,84 @@ const R3 = (() => {
     }
     return {geo, mat};
   }
+  // Animierter Zauberer (modelle/held_anim.glb von tools/meshy_rig.py): Clips Ruhe, Laufen, Zaubern über den GLTFLoader
+  const HA = {mixer: null, act: {}, cur: null, t: 0, x: 0, y: 0, castT: 0, shots: 0};
+  async function loadAnimHero() {
+    const {GLTFLoader} = await import('./vendor/loaders/GLTFLoader.js');
+    const g = await new GLTFLoader().loadAsync('modelle/held_anim.glb');
+    const root = g.scene, box = new THREE.Box3(); root.updateMatrixWorld(true);
+    root.traverse(o => { if (o.isSkinnedMesh) { o.computeBoundingBox(); box.union(o.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });   // Größe mit Skelett
+    if (box.isEmpty()) box.setFromObject(root);
+    const h = box.max.y - box.min.y || 1;
+    root.traverse(o => { if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({map: o.material.map, emissive: '#000'}); o.frustumCulled = false; robeMat = o.material; } });
+    root.position.set(-(box.min.x + box.max.x) / 2, -box.min.y, -(box.min.z + box.max.z) / 2);
+    const wrap = new THREE.Group(); wrap.add(root); wrap.scale.setScalar(72 / h);
+    for (const c of player.children) c.visible = false;
+    player.add(wrap);
+    HA.mixer = new THREE.AnimationMixer(root);
+    const pick = (re, i) => g.animations.find(a => re.test(a.name)) || g.animations[i];
+    for (const [k, re, i] of [['idle', /idle/i, 0], ['walk', /walk/i, 1], ['cast', /cast|spell|soell/i, 2]]) {
+      const clip = pick(re, i); if (!clip) continue; const a = HA.mixer.clipAction(clip);
+      if (k === 'cast') { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; }
+      HA.act[k] = a;
+    }
+    play('idle', 0); MOD.held = true;
+    console.info('Zauberer-Animationen:', g.animations.map(a => a.name + ' ' + a.duration.toFixed(1) + ' s').join(', '));
+  }
+  function play(k, fade = .2) {
+    const a = HA.act[k]; if (!a || HA.cur === a) return;
+    a.reset().play(); if (HA.cur) HA.cur.crossFadeTo(a, fade, false); HA.cur = a;
+  }
+  function animHero(G) {
+    if (!HA.mixer) return;
+    const p = G.p, dt = Math.min(.1, Math.max(0, G.t - HA.t)); HA.t = G.t;
+    const moved = Math.hypot(p.x - HA.x, p.y - HA.y); HA.x = p.x; HA.y = p.y;
+    const n = G.shots.length; if (n > HA.shots && HA.castT <= 0) HA.castT = .9; HA.shots = n;   // neue Geschosse → zaubern
+    if (dt > 0) HA.castT -= dt;
+    play(dt > 0 && moved > dt * 25 ? 'walk' : HA.castT > 0 ? 'cast' : 'idle');
+    HA.mixer.update(dt);
+  }
+
   async function loadModels() {
+    try { await loadAnimHero(); } catch (err) { console.info('Kein animierter Zauberer:', err.message); }
     try {
-      const held = await loadGlb('modelle/held.glb');
+      const held = !MOD.held && await loadGlb('modelle/held.glb');
       if (held) {
         for (const c of player.children) c.visible = false;
         const m = new THREE.Mesh(held.geo, held.mat); m.scale.setScalar(72); player.add(m);
         MOD.held = held; robeMat = held.mat; robeMat.emissive = new THREE.Color('#000');
       }
-      const bug = await loadGlb('modelle/bug.glb');
-      if (bug) {   // Breite des Modells → 2 (wie die Kugel mit Radius 1)
-        const bb = bug.geo.boundingBox, w = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) || 1;
-        bug.geo.scale(2 / w, 2 / w, 2 / w); I.bug.geometry.dispose(); I.bug.geometry = bug.geo; I.bug.material = bug.mat; MOD.bug = bug;
-      }
+      await Promise.all(Object.keys(FOE_K).map(async k => {
+        const m = await loadGlb('modelle/' + k + '.glb'); if (!m) return;
+        const bb = m.geo.boundingBox, w = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) || 1;   // Breite → 2 (wie die Kugel mit Radius 1)
+        m.geo.scale(2 / w, 2 / w, 2 / w); I[k].geometry.dispose(); I[k].geometry = m.geo; I[k].material = m.mat; MOD[k] = m;
+      }));
     } catch (err) { console.warn('3D-Modelle nicht geladen:', err); }
   }
 
+  // Deko liegt fest im Raster (Zelle cs): dieselbe Rechnung fürs Zeichnen und für Zusammenstöße (solidAt/collide)
+  const cs = 110, SOLID = {pine: 15, oak: 15, rock: 13};   // Radius × Größe; Büsche kann man durchlaufen
+  function deco(i, j) {
+    if (Math.abs(i) <= 1 && Math.abs(j) <= 1) return null;   // Startplatz frei
+    const h = hash(i, j); if (h % 9) return null;
+    return {x: i * cs + (h >>> 4) % 80, z: j * cs + (h >>> 11) % 80, s: .75 + ((h >>> 18) % 60) / 100, ry: (h >>> 7) % 6,
+      kind: ['pine', 'oak', 'bush', 'rock', 'pine', 'oak', 'bush'][(h >>> 22) % 7]};
+  }
+  function solidNear(x, y, f) {
+    const ci = Math.floor(x / cs), cj = Math.floor(y / cs);
+    for (let j = cj - 1; j <= cj + 1; j++) for (let i = ci - 1; i <= ci + 1; i++) { const d = deco(i, j); if (d && SOLID[d.kind]) f(d.x, d.z, SOLID[d.kind] * d.s); }
+  }
+  // Schiebt einen Kreis (o.x, o.y, Radius r) aus Bäumen und Steinen heraus
+  function collide(o, r) { solidNear(o.x, o.y, (x, z, R) => { const dx = o.x - x, dy = o.y - z, d = Math.hypot(dx, dy), m = R + r; if (d < m) { const k = d > .01 ? (m - d) / d : 0; o.x += dx * k; o.y += dy * k + (d > .01 ? 0 : m); } }); }
+  function blocked(x, y, r) { let b = false; solidNear(x, y, (sx, sz, R) => { if (Math.hypot(x - sx, y - sz) < R + r) b = true; }); return b; }
+
   function placeTrees(p) {
-    const cs = 110, ci = Math.floor(p.x / cs), cj = Math.floor(p.y / cs), key = ci + ',' + cj;
+    const ci = Math.floor(p.x / cs), cj = Math.floor(p.y / cs), key = ci + ',' + cj;
     if (key === treeKey) return; treeKey = key;
     const n = {trunk: 0, pine: 0, oak: 0, bush: 0, rock: 0};
     for (let j = cj - 17; j <= cj + 6; j++) for (let i = ci - 15; i <= ci + 15; i++) {
-      const h = hash(i, j); if (h % 9) continue;
-      const x = i * cs + (h >>> 4) % 80, z = j * cs + (h >>> 11) % 80, s = .75 + ((h >>> 18) % 60) / 100, ry = (h >>> 7) % 6;
-      const kind = ['pine', 'oak', 'bush', 'rock', 'pine', 'oak', 'bush'][(h >>> 22) % 7];
+      const d = deco(i, j); if (!d) continue;
+      const {x, z, s, ry, kind} = d;
       put(I[kind], n[kind]++, x, 0, z, s, s, s, ry);
       if (kind === 'pine' || kind === 'oak') put(I.trunk, n.trunk++, x, 0, z, s, s, s);
     }
@@ -178,7 +233,8 @@ const R3 = (() => {
     placeTrees(p);
 
     // Zauberer
-    player.position.set(p.x, Math.abs(Math.sin(t * 9)) * 3, p.y);
+    player.position.set(p.x, HA.mixer ? 0 : Math.abs(Math.sin(t * 9)) * 3, p.y);
+    animHero(G);
     player.rotation.y = Math.atan2(p.dx, p.dy);
     robeMat.emissive.set(p.hurtT > 0 ? '#991b1b' : '#000');
     let sh = 0; put(I.shadow, sh++, p.x, .5, p.y, 16);
@@ -188,10 +244,15 @@ const R3 = (() => {
     for (const e of G.en) {
       const m = I[e.type], i = n[e.type]++, r = e.r, ry = Math.atan2(p.x - e.x, p.y - e.y);
       let y = r, sx = r, sy = r, sz = r;
-      if (e.type === 'bug') {
-        if (MOD.bug) { const k = e.flash > 0 ? 1.9 : 1.6; sx = sy = sz = r * k; y = Math.abs(Math.sin(t * 14 + e.x)) * 2; }
-        else { sy = r * .7; sz = r * 1.2; y = r * .7 + Math.abs(Math.sin(t * 14 + e.x)) * 2; }
+      if (MOD[e.type]) {   // 3D-Modell: zum Zauberer drehen, leicht hüpfen; Treffer = kurz größer, Textur nur leicht tönen
+        const big = e.type === 'boss' || e.type === 'tutor' || e.type === 'abi', s = r * FOE_K[e.type] * (e.flash > 0 ? (big ? 1.06 : 1.2) : 1);
+        y = e.type === 'glitch' ? r * .8 + Math.sin(t * 6 + e.y) * 3 : big ? Math.abs(Math.sin(t * 3)) * 4 : Math.abs(Math.sin(t * 12 + e.x)) * 2 + (e.dash > 0 ? 4 : 0);
+        put(m, i, e.x, y, e.y, s, s, s, ry);
+        col(m, i, e.flash > 0 ? '#ffd4d4' : e.slow > 0 && !big ? '#9ddcff' : e.dash > 0 ? '#ffe9a8' : '#ffffff');
+        put(I.shadow, sh++, e.x, .5, e.y, r * 1.1);
+        continue;
       }
+      if (e.type === 'bug') { sy = r * .7; sz = r * 1.2; y = r * .7 + Math.abs(Math.sin(t * 14 + e.x)) * 2; }
       if (e.type === 'glitch') { y = r * 1.6 + Math.sin(t * 6 + e.y) * 3; }
       if (e.type === 'lock') { sx = sz = r * 1.6; sy = r * 1.6; y = r * .8; }
       if (e.type === 'boss') { y = r * 1.3; }
@@ -202,10 +263,9 @@ const R3 = (() => {
       if (e.type === 'tutor') { y = r * 1.25 + Math.sin(t * 2) * 4; put(I.cap, ncap++, e.x, y + r * 1.05, e.y, r * 1.5, r * 1.5, r * 1.5, t * .7); }
       put(m, i, e.x, y, e.y, sx, sy, sz, e.type === 'glitch' || e.type === 'boss' ? t * 2 + e.x : e.type === 'tutor' ? t * .7 : ry);
       const big = e.type === 'boss' || e.type === 'tutor' || e.type === 'abi';   // Bosse nur leicht aufhellen, sonst blinken sie dauerhaft weiß
-      if (e.type === 'bug' && MOD.bug) col(m, i, e.flash > 0 ? '#ffd4d4' : e.slow > 0 ? '#9ddcff' : '#ffffff');   // Modell: Textur zeigen, nur leicht tönen
-      else col(m, i, e.flash > 0 ? (big ? (e.type === 'tutor' ? '#fde68a' : e.type === 'abi' ? '#ddd6fe' : '#f87171') : '#ffffff') : e.slow > 0 && !big ? '#7dd3fc' : e.dash > 0 ? '#fde047' : FOE_COL[e.type]);
+      col(m, i, e.flash > 0 ? (big ? (e.type === 'tutor' ? '#fde68a' : e.type === 'abi' ? '#ddd6fe' : '#f87171') : '#ffffff') : e.slow > 0 && !big ? '#7dd3fc' : e.dash > 0 ? '#fde047' : FOE_COL[e.type]);
       put(I.shadow, sh++, e.x, .5, e.y, r * 1.1);
-      if (e.type !== 'boss' && e.type !== 'spam' && !(e.type === 'bug' && MOD.bug)) for (const s of [-1, 1]) {   // Augen Richtung Zauberer
+      if (e.type !== 'boss' && e.type !== 'spam') for (const s of [-1, 1]) {   // Augen Richtung Zauberer
         const ex = e.x + Math.sin(ry) * r * .9 + Math.cos(ry) * s * r * .35, ez = e.y + Math.cos(ry) * r * .9 - Math.sin(ry) * s * r * .35;
         put(I.eye, ne++, ex, y + r * .25, ez, Math.max(1.6, r * .16));
       }
@@ -277,5 +337,5 @@ const R3 = (() => {
     scene.background.set(T.sky); scene.fog.color.set(T.sky); hemi.groundColor.set(T.low);
     for (const k of ['pine', 'oak', 'bush', 'rock', 'trunk']) I[k].material.color.set(T[k]);
   }
-  return {init, render, toScreen, setLook, setWorld};
+  return {init, render, toScreen, setLook, setWorld, collide, blocked};
 })();

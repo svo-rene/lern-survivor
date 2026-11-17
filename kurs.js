@@ -6,15 +6,11 @@
 // Link nur für ein Fach: index.html?fach=physik
 window.FAECHER = [
   // bosse: Endboss von Welt 1, 2, 3 (Symbol, Name mit Artikel); sieg: Meldung nach dem letzten Endboss; aufgaben: was Boss 2 tut;
-  // gegner: Name [Einzahl, Mehrzahl] je Gegnerart; welten: Beschreibung der Gegner je Welt
+  // Gegner (Krabbelkäfer, Flackergeist …) sind in allen Fächern gleich: FOES in index.html, Modelle in modelle/
   {id: 'informatik', icon: '💻', name: 'Informatik', stufe: 'Leistungskurs Klasse 11/12',
-   bosse: [['📝', 'Die Leistungskontrolle'], ['🧑‍🏫', 'Der Tutor'], ['🎓', 'Das Abitur']], sieg: 'Abitur bestanden', aufgaben: 'verteilt Hausaufgaben',
-   gegner: {bug: ['Bug', 'Bugs'], glitch: ['Glitch', 'Glitches'], lock: ['Deadlock', 'Deadlocks'], spam: ['Spam', 'Spam'], fork: ['Fork', 'Forks'], over: ['Overflow', 'Overflows']},
-   welten: ['Bugs, Glitches und Deadlocks.', 'Neu: Spam schießt, Forks teilen sich.', 'Neu: Overflows stürmen los.']},
+   bosse: [['📝', 'Die Leistungskontrolle'], ['🧑‍🏫', 'Der Tutor'], ['🎓', 'Das Abitur']], sieg: 'Abitur bestanden', aufgaben: 'verteilt Hausaufgaben'},
   {id: 'physik',     icon: '🧲', name: 'Physik',     stufe: 'Klasse 7',
-   bosse: [['🧪', 'Das Experiment'], ['📝', 'Die Leistungskontrolle'], ['👩‍🏫', 'Die Lehrkraft']], sieg: 'Lehrkraft überzeugt', aufgaben: 'teilt Aufgaben aus',
-   gegner: {bug: ['Messfehler', 'Messfehler'], glitch: ['Funke', 'Funken'], lock: ['Massestück', 'Massestücke'], spam: ['Luftballon', 'Luftballons'], fork: ['Stabmagnet', 'Stabmagnete'], over: ['Feder', 'Federn']},
-   welten: ['Messfehler, Funken und schwere Massestücke.', 'Neu: Geladene Luftballons schießen, Stabmagnete zerbrechen in zwei.', 'Neu: Gespannte Federn schnellen plötzlich los.']},
+   bosse: [['🧪', 'Das Experiment'], ['📝', 'Die Leistungskontrolle'], ['👩‍🏫', 'Die Lehrkraft']], sieg: 'Lehrkraft überzeugt', aufgaben: 'teilt Aufgaben aus'},
 ];
 // Reihenfolge wie im Kurs: Grundlagen → Algorithmen → Datenstrukturen → Kl. 11 → Kl. 12
 window.LERNBEREICHE = [
