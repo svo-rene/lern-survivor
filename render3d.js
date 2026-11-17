@@ -19,7 +19,7 @@ const R3 = (() => {
     if (e > 0) h += e * e * .006 + e * .45 + 40 * Math.sin(x / 90) * Math.cos(z / 110) * Math.min(1, e / 200);
     return h;
   }
-  function put(m, i, x, y, z, sx, sy, sz, ry = 0, rx = 0) { P.set(x, y + ht(x, z), z); E.set(rx, ry, 0); Qt.setFromEuler(E); S.set(sx, sy ?? sx, sz ?? sx); M.compose(P, Qt, S); m.setMatrixAt(i, M); }
+  function put(m, i, x, y, z, sx, sy, sz, ry = 0, rx = 0, rz = 0) { P.set(x, y + ht(x, z), z); E.set(rx, ry, rz, 'YXZ'); Qt.setFromEuler(E); S.set(sx, sy ?? sx, sz ?? sx); M.compose(P, Qt, S); m.setMatrixAt(i, M); }
   function col(m, i, c) { m.setColorAt(i, C.set(c)); }
   function done(m, n) { m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
   function hash(i, j) { let h = Math.imul(i, 374761393) + Math.imul(j, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; }
@@ -187,8 +187,11 @@ const R3 = (() => {
     const wrap = new THREE.Group(); wrap.add(root); wrap.scale.setScalar(72 / h); wrap.visible = false; player.add(wrap);
     const H = {wrap, mat, mixer: new THREE.AnimationMixer(root), act: {}, cur: null};
     const pick = (re, i) => g.animations.find(a => re.test(a.name)) || g.animations[i];
-    for (const [k, re, i] of [['idle', /idle/i, 0], ['walk', /walk/i, 1], ['cast', /cast|spell|soell|shot|throw|attack|slash/i, 2]]) {
-      const clip = pick(re, i); if (!clip) continue; const a = H.mixer.clipAction(clip);
+    for (const [k, re, i] of [['idle', /idle/i, 0], ['walk', /walk/i, 1], ['cast', /cast|spell|soell|shot|throw|attack|slash/i, 2], ['slide', /slide/i, 3]]) {
+      const clip = pick(re, i); if (!clip) continue;
+      if (k === 'slide') { clip.tracks.forEach(tr => { if (/\.position$/.test(tr.name)) for (let j = 0; j < tr.values.length; j += 3) { tr.values[j] = tr.values[0]; tr.values[j + 2] = tr.values[2]; } }); }   // auf der Stelle: Bewegung macht das Spiel
+      const a = H.mixer.clipAction(clip);
+      if (k === 'slide') { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; a.timeScale = Math.max(1, clip.duration / .45); }
       if (k === 'cast') { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; a.timeScale = Math.max(1, clip.duration / 1.1); }   // Angriff in etwa 1 s
       H.act[k] = a;
     }
@@ -212,12 +215,42 @@ const R3 = (() => {
     const p = G.p, dt = Math.min(.1, Math.max(0, G.t - HA.t)); HA.t = G.t;
     const moved = Math.hypot(p.x - HA.x, p.y - HA.y); HA.x = p.x; HA.y = p.y;
     const n = G.shots.length; if (n > HA.shots && HA.castT <= 0) HA.castT = 1.1; HA.shots = n;   // neue Geschosse → Angriff
-    if (dt > 0) HA.castT -= dt;
+    if (dt > 0) { HA.castT -= dt; HA.slideT -= dt; }
+    if (p.dashT > 0 && HA.H.act.slide && !(HA.slideT > 0)) { HA.slideT = .45; HA.H.cur = null; play('slide', .06); }   // Dash = Rutschen
+    if (HA.slideT > 0) { HA.H.mixer.update(dt); return; }
     play(dt > 0 && moved > dt * 25 ? 'walk' : HA.castT > 0 ? 'cast' : 'idle');
     HA.H.mixer.update(dt);
   }
 
+  // Bosse mit Skelett (modelle/<typ>_anim.glb von tools/meshy_anim.py): ein Exemplar, statt der Instanz gezeichnet
+  const BA = {};
+  async function loadBoss(k) {
+    const {GLTFLoader} = await import('./vendor/loaders/GLTFLoader.js');
+    const g = await new GLTFLoader().loadAsync('modelle/' + k + '_anim.glb');
+    const root = g.scene, box = new THREE.Box3(); root.updateMatrixWorld(true);
+    root.traverse(o => { if (o.isSkinnedMesh) { o.computeBoundingBox(); box.union(o.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
+    if (box.isEmpty()) box.setFromObject(root);
+    const w = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) || 1;
+    root.traverse(o => { if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({map: o.material.map, emissive: '#000'}); o.frustumCulled = false; } });
+    root.position.set(-(box.min.x + box.max.x) / 2, -box.min.y, -(box.min.z + box.max.z) / 2);
+    const wrap = new THREE.Group(), inner = new THREE.Group(); inner.add(root); inner.scale.setScalar(2 / w); wrap.add(inner); wrap.visible = false; scene.add(wrap);
+    const B = {wrap, mixer: new THREE.AnimationMixer(root), act: {}, cur: null, t: 0, mats: []};
+    root.traverse(o => { if (o.isMesh) B.mats.push(o.material); });
+    const pick = (re, i) => g.animations.find(a => re.test(a.name)) || g.animations[i];
+    for (const [n, re, i] of [['idle', /idle/i, 0], ['walk', /walk/i, 1], ['attack', /attack/i, 2]]) { const c = pick(re, i); if (c) B.act[n] = B.mixer.clipAction(c); }
+    BA[k] = B;
+  }
+  function bossAnim(e, s, ry) {
+    const B = BA[e.type]; if (!B) return false;
+    B.seen = true; B.wrap.visible = true; B.wrap.position.set(e.x, ht(e.x, e.y), e.y); B.wrap.rotation.y = ry; B.wrap.scale.setScalar(s);
+    for (const m of B.mats) m.emissive.set(e.flash > 0 ? '#7f1d1d' : '#000');
+    const k = e.tele > 0 || e.spiral > 0 ? 'attack' : 'walk', a = B.act[k] || B.act.idle;
+    if (a && B.cur !== a) { a.reset().play(); if (B.cur) B.cur.crossFadeTo(a, .2, false); B.cur = a; }
+    return true;
+  }
+
   async function loadModels() {
+    for (const k of ['tutor', 'abi']) loadBoss(k).catch(() => {});
     setHero(HA.want || 'zauberer');
     try {
       const kiste = await loadGlb('modelle/kiste.glb');
@@ -321,8 +354,18 @@ const R3 = (() => {
       let y = r, sx = r, sy = r, sz = r;
       if (MOD[e.type]) {   // 3D-Modell: zum Zauberer drehen, leicht hüpfen; Treffer = kurz größer, Textur nur leicht tönen
         const big = e.type === 'boss' || e.type === 'tutor' || e.type === 'abi', s = r * FOE_K[e.type] * (e.flash > 0 ? (big ? 1.06 : 1.2) : 1);
-        y = e.type === 'glitch' ? r * .8 + Math.sin(t * 6 + e.y) * 3 : big ? Math.abs(Math.sin(t * 3)) * 4 : Math.abs(Math.sin(t * 12 + e.x)) * 2 + (e.dash > 0 ? 4 : 0);
-        put(m, i, e.x, y, e.y, s, s, s, ry);
+        const ph = e.x * .013 + e.y * .007; let sx2 = s, sy2 = s, sz2 = s, rx = 0, rz = 0; y = 0;
+        switch (e.type) {   // Bewegung ohne Skelett: wackeln, watscheln, quetschen, rollen
+          case 'bug': rz = Math.sin(t * 22 + ph * 9) * .14; y = Math.abs(Math.sin(t * 22 + ph * 9)) * 2.5; break;
+          case 'glitch': y = r * .8 + Math.sin(t * 5 + ph * 7) * 5; rz = Math.sin(t * 3 + ph * 5) * .22; sy2 = s * (1 + Math.sin(t * 7 + ph) * .07); break;
+          case 'lock': rz = Math.sin(t * 6 + ph * 3) * .11; y = Math.abs(Math.sin(t * 6 + ph * 3)) * 5; break;
+          case 'spam': { const pf = e.cd < .5 ? 1 + (.5 - e.cd) * .5 : 1; sy2 = s * (1 + Math.sin(t * 9 + ph * 4) * .08) * pf; sx2 = sz2 = s * (1 - Math.sin(t * 9 + ph * 4) * .05) * pf; rz = Math.sin(t * 4.5 + ph) * .08; break; }
+          case 'fork': { const j = Math.sin(t * 11 + ph * 6); sy2 = s * (1 + j * .16); sx2 = sz2 = s * (1 - j * .08); break; }
+          case 'over': if (e.dash > 0) { rx = t * 22; y = r * .5; } else if (e.tele > 0) { sy2 = s * .82; rz = Math.sin(t * 60) * .08; } else { rz = Math.sin(t * 14 + ph * 5) * .12; y = Math.abs(Math.sin(t * 14 + ph * 5)) * 3; } break;
+          default: rz = Math.sin(t * 3.2) * .07; y = Math.abs(Math.sin(t * 3.2)) * 5; if (e.tele > 0) { sy2 = s * .9; rx = -.12; } else if (e.dash > 0) rx = .22;   // Bosse: stapfen, ducken vor dem Sturm
+        }
+        if (bossAnim(e, s, ry)) { n[e.type]--; put(I.shadow, sh++, e.x, .5, e.y, r * 1.1); continue; }
+        put(m, i, e.x, y, e.y, sx2, sy2, sz2, ry, rx, rz);
         col(m, i, e.flash > 0 ? '#ffd4d4' : e.slow > 0 && !big ? '#9ddcff' : e.dash > 0 ? '#ffe9a8' : '#ffffff');
         put(I.shadow, sh++, e.x, .5, e.y, r * 1.1);
         continue;
@@ -346,6 +389,7 @@ const R3 = (() => {
       }
     }
     for (const k in n) done(I[k], n[k]); done(I.eye, ne); done(I.cap, ncap);
+    for (const k in BA) { const B = BA[k]; if (!B.seen) B.wrap.visible = false; B.seen = false; const d = Math.min(.1, Math.max(0, t - B.t)); B.t = t; B.mixer.update(d); }
     let neb = 0; for (const s of (G.eshots || [])) { put(I.eshot, neb, s.x, 16, s.y, s.r); col(I.eshot, neb++, s.col || '#f43f5e'); } done(I.eshot, neb);
 
     // Geschosse
