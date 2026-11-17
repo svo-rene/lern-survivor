@@ -13,6 +13,11 @@ STIL = 'cute stylized low poly game asset, chibi proportions, bright friendly co
 MODELLE = {
     'held': 'a young wizard in a purple robe and a tall pointy purple hat, holding a wooden staff with a glowing blue crystal on top',
     'bug':  'a round red ladybug beetle creature with big friendly eyes and six short legs',
+    'held_jaeger': 'a young forest ranger in a green hooded cloak with a wooden bow and a quiver of arrows on the back, arms slightly away from the body',
+    'held_alchemist': 'a young alchemist in a brown leather apron and goggles on the forehead, holding a bubbling green potion flask, arms slightly away from the body',
+    'held_ritter': 'a young knight in shiny silver armor with a blue tabard, holding a sword, arms slightly away from the body',
+    'held_gelehrter': 'a young female scholar in a long blue robe with round glasses and an owl emblem, holding a big book, arms slightly away from the body',
+    'kiste': 'a closed wooden treasure chest with golden metal bands and a golden lock, slightly cartoonish',
     'glitch': 'a small floating ghost creature, light purple, with a mischievous grin and little arms',
     'lock': 'a chunky grey rock golem creature with a grumpy face and short stubby legs',
     'spam': 'a yellow mushroom creature with a big round mouth spitting spores, tiny feet',

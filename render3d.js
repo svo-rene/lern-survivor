@@ -2,7 +2,7 @@
 // Die Spiellogik rechnet weiter flach: Spiel-x → 3D-X, Spiel-y → 3D-Z, Einheiten = Pixel.
 'use strict';
 const R3 = (() => {
-  const slashPool = [], slashGeo = {}; let shield;
+  const slashPool = [], slashGeo = {}, stations = []; let shield;
   let hemi, worldNow = 0, ren, scene, cam, ground, player, robeMat, hatMat, aura, bolts, lastW = 0, lastH = 0, treeKey = '';
   const I = {};                       // Instanced Meshes
   const M = new THREE.Matrix4(), Qt = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), E = new THREE.Euler(), C = new THREE.Color();
@@ -10,7 +10,16 @@ const R3 = (() => {
   const lam = (c, extra) => new THREE.MeshLambertMaterial(Object.assign({color: c, flatShading: true}, extra));
   const basic = (c, extra) => new THREE.MeshBasicMaterial(Object.assign({color: c}, extra));
   function inst(name, geo, mat, n) { const m = new THREE.InstancedMesh(geo, mat, n); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.count = 0; m.frustumCulled = false; scene.add(m); I[name] = m; return m; }
-  function put(m, i, x, y, z, sx, sy, sz, ry = 0, rx = 0) { P.set(x, y, z); E.set(rx, ry, 0); Qt.setFromEuler(E); S.set(sx, sy ?? sx, sz ?? sx); M.compose(P, Qt, S); m.setMatrixAt(i, M); }
+  // Arena: Spielfeld ±ARENA, außen Berge; innen sanfte Hügel (nur Optik, die Spiellogik bleibt flach)
+  const ARENA = 1500;
+  function ht(x, z) {
+    const r = Math.hypot(x, z), calm = Math.min(1, Math.max(0, (r - 250) / 450));   // Startplatz eben
+    let h = calm * (34 * Math.sin(x / 230 + 1.3) * Math.cos(z / 270 - .4) + 18 * Math.sin((x - z) / 150) + 14 * Math.cos((x + 2 * z) / 340));
+    const e = Math.max(Math.abs(x), Math.abs(z)) - (ARENA - 40);
+    if (e > 0) h += e * e * .006 + e * .45 + 40 * Math.sin(x / 90) * Math.cos(z / 110) * Math.min(1, e / 200);
+    return h;
+  }
+  function put(m, i, x, y, z, sx, sy, sz, ry = 0, rx = 0) { P.set(x, y + ht(x, z), z); E.set(rx, ry, 0); Qt.setFromEuler(E); S.set(sx, sy ?? sx, sz ?? sx); M.compose(P, Qt, S); m.setMatrixAt(i, M); }
   function col(m, i, c) { m.setColorAt(i, C.set(c)); }
   function done(m, n) { m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
   function hash(i, j) { let h = Math.imul(i, 374761393) + Math.imul(j, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; }
@@ -33,14 +42,20 @@ const R3 = (() => {
 
   function init(canvas) {
     ren = new THREE.WebGLRenderer({canvas, antialias: true}); ren.setPixelRatio(Math.min(2, devicePixelRatio || 1));
-    scene = new THREE.Scene(); scene.background = new THREE.Color('#a7d8f0'); scene.fog = new THREE.Fog('#a7d8f0', 900, 1750);
+    scene = new THREE.Scene(); scene.background = new THREE.Color('#a7d8f0'); scene.fog = new THREE.Fog('#a7d8f0', 1000, 2300);
     cam = new THREE.PerspectiveCamera(48, 1, 10, 4000);
     hemi = new THREE.HemisphereLight('#eaf6ff', '#4a6b2a', 1.4); scene.add(hemi);
     const sun = new THREE.DirectionalLight('#fff4d6', 1.8); sun.position.set(-300, 700, 250); scene.add(sun);
 
-    const tex = grassTexture(); tex.repeat.set(4096 / 256, 4096 / 256);
-    ground = new THREE.Mesh(new THREE.PlaneGeometry(4096, 4096), new THREE.MeshLambertMaterial({map: tex}));
-    ground.rotation.x = -Math.PI / 2; scene.add(ground);
+    const tex = grassTexture();
+    const GS = 2 * ARENA + 1600, gg = new THREE.PlaneGeometry(GS, GS, 160, 160).rotateX(-Math.PI / 2), gp = gg.attributes.position, gc = new Float32Array(gp.count * 3);
+    for (let i = 0; i < gp.count; i++) {   // Höhe und Farbe: Berge am Rand grau-felsig
+      const x = gp.getX(i), z = gp.getZ(i), h = ht(x, z); gp.setY(i, h);
+      const k = Math.min(1, Math.max(0, (h - 70) / 260)), c = 1 - .42 * k; gc.set([c, c * .97 + .03 * k, c * .95 + .05 * k], i * 3);
+    }
+    gg.setAttribute('color', new THREE.BufferAttribute(gc, 3)); gg.computeVertexNormals();
+    tex.repeat.set(GS / 256, GS / 256);
+    ground = new THREE.Mesh(gg, new THREE.MeshLambertMaterial({map: tex, vertexColors: true})); scene.add(ground);
 
     // Welt-Deko
     inst('trunk', new THREE.CylinderGeometry(5, 7, 30, 6).translate(0, 15, 0), lam('#7c4a21'), 400);
@@ -85,8 +100,8 @@ const R3 = (() => {
     inst('arrow', new THREE.BoxGeometry(2.5, 2.5, 18), basic('#fff'), 250);
     inst('blade', new THREE.TorusGeometry(1, .22, 4, 10).rotateX(Math.PI / 2), lam('#fff'), 40);
     inst('frost', new THREE.OctahedronGeometry(1, 0), basic('#bae6fd'), 40);
-    inst('gem', new THREE.OctahedronGeometry(5, 0), basic('#fff'), 450);
-    inst('coin', new THREE.CylinderGeometry(6, 6, 2, 14).rotateX(Math.PI / 2), lam('#fbbf24', {emissive: '#78350f'}), 200);
+    inst('gem', new THREE.LatheGeometry([[0, -6.5], [4.6, -.6], [3.4, 1.6], [0, 2.2]].map(([x, y]) => new THREE.Vector2(x, y)), 8), lam('#fff', {emissive: '#1e293b'}), 450);   // geschliffener Stein
+    inst('coin', new THREE.LatheGeometry([[0, -.8], [4.4, -.8], [4.8, -1.3], [6.2, -1.2], [6.5, 0], [6.2, 1.2], [4.8, 1.3], [4.4, .8], [0, .8]].map(([x, y]) => new THREE.Vector2(x, y)), 22).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({color: '#fbbf24', emissive: '#7c3a07'}), 200);   // Münze mit Rand
     inst('chest', new THREE.BoxGeometry(34, 22, 24).translate(0, 11, 0), lam('#92400e'), 8);
     inst('lid', new THREE.CylinderGeometry(12, 12, 34, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).translate(0, 22, 0), lam('#b45309'), 8);
     inst('band', new THREE.BoxGeometry(36, 4, 26).translate(0, 17, 0), lam('#fbbf24', {emissive: '#713f12'}), 8);
@@ -103,6 +118,16 @@ const R3 = (() => {
     aura.visible = false; scene.add(aura);
     bolts = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color: '#e0f2fe'}));
     bolts.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(600 * 3), 3)); bolts.frustumCulled = false; scene.add(bolts);
+    // Lernstationen: Steinpult mit leuchtendem Buch und Lichtsäule (höchstens 4)
+    for (let i = 0; i < 4; i++) {
+      const g = new THREE.Group(), add = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; g.add(m); return m; };
+      add(new THREE.CylinderGeometry(22, 28, 10, 8), lam('#94a3b8'), 5);
+      add(new THREE.CylinderGeometry(9, 12, 30, 8), lam('#cbd5e1'), 25);
+      add(new THREE.BoxGeometry(30, 4, 22).rotateX(-.35), lam('#fef3c7', {emissive: '#78350f'}), 42);
+      g.userData.gem = add(new THREE.OctahedronGeometry(8, 0), basic('#38bdf8'), 66);
+      g.userData.beam = add(new THREE.CylinderGeometry(14, 14, 420, 12, 1, true), basic('#7dd3fc', {transparent: true, opacity: .16, depthWrite: false, side: THREE.DoubleSide}), 230);
+      g.visible = false; scene.add(g); stations.push(g);
+    }
     loadModels();
   }
 
@@ -140,52 +165,59 @@ const R3 = (() => {
     }
     return {geo, mat};
   }
-  // Animierter Zauberer (modelle/held_anim.glb von tools/meshy_rig.py): Clips Ruhe, Laufen, Zaubern über den GLTFLoader
-  const HA = {mixer: null, act: {}, cur: null, t: 0, x: 0, y: 0, castT: 0, shots: 0};
-  async function loadAnimHero() {
+  // Animierte Helden (modelle/<datei>_anim.glb von tools/meshy_rig.py): Clips Ruhe, Laufen, Angriff über den GLTFLoader.
+  // Je Klasse ein Modell, wird erst beim Spielstart geladen; fehlt es, bleibt der Zauberer.
+  const HERO_FILE = {zauberer: 'held', jaeger: 'held_jaeger', alchemist: 'held_alchemist', ritter: 'held_ritter', gelehrter: 'held_gelehrter'};
+  const HEROES = {}, HA = {H: null, want: null, t: 0, x: 0, y: 0, castT: 0, shots: 0};
+  async function loadHero(id) {
     const {GLTFLoader} = await import('./vendor/loaders/GLTFLoader.js');
-    const g = await new GLTFLoader().loadAsync('modelle/held_anim.glb');
-    const root = g.scene, box = new THREE.Box3(); root.updateMatrixWorld(true);
+    const g = await new GLTFLoader().loadAsync('modelle/' + HERO_FILE[id] + '_anim.glb');
+    const root = g.scene, box = new THREE.Box3(); let mat; root.updateMatrixWorld(true);
     root.traverse(o => { if (o.isSkinnedMesh) { o.computeBoundingBox(); box.union(o.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });   // Größe mit Skelett
     if (box.isEmpty()) box.setFromObject(root);
     const h = box.max.y - box.min.y || 1;
-    root.traverse(o => { if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({map: o.material.map, emissive: '#000'}); o.frustumCulled = false; robeMat = o.material; } });
+    root.traverse(o => { if (o.isMesh) { o.material = mat = new THREE.MeshLambertMaterial({map: o.material.map, emissive: '#000'}); o.frustumCulled = false; } });
     root.position.set(-(box.min.x + box.max.x) / 2, -box.min.y, -(box.min.z + box.max.z) / 2);
-    const wrap = new THREE.Group(); wrap.add(root); wrap.scale.setScalar(72 / h);
-    for (const c of player.children) c.visible = false;
-    player.add(wrap);
-    HA.mixer = new THREE.AnimationMixer(root);
+    const wrap = new THREE.Group(); wrap.add(root); wrap.scale.setScalar(72 / h); wrap.visible = false; player.add(wrap);
+    const H = {wrap, mat, mixer: new THREE.AnimationMixer(root), act: {}, cur: null};
     const pick = (re, i) => g.animations.find(a => re.test(a.name)) || g.animations[i];
-    for (const [k, re, i] of [['idle', /idle/i, 0], ['walk', /walk/i, 1], ['cast', /cast|spell|soell/i, 2]]) {
-      const clip = pick(re, i); if (!clip) continue; const a = HA.mixer.clipAction(clip);
-      if (k === 'cast') { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; }
-      HA.act[k] = a;
+    for (const [k, re, i] of [['idle', /idle/i, 0], ['walk', /walk/i, 1], ['cast', /cast|spell|soell|shot|throw|attack|slash/i, 2]]) {
+      const clip = pick(re, i); if (!clip) continue; const a = H.mixer.clipAction(clip);
+      if (k === 'cast') { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; a.timeScale = Math.max(1, clip.duration / 1.1); }   // Angriff in etwa 1 s
+      H.act[k] = a;
     }
-    play('idle', 0); MOD.held = true;
-    console.info('Zauberer-Animationen:', g.animations.map(a => a.name + ' ' + a.duration.toFixed(1) + ' s').join(', '));
+    return H;
+  }
+  function setHero(id) {
+    if (!HERO_FILE[id]) id = 'zauberer'; HA.want = id;
+    if (!HEROES[id]) HEROES[id] = loadHero(id).catch(err => { console.info('Kein Modell für ' + id + ':', err.message); return id === 'zauberer' ? null : (HEROES.zauberer || (HEROES.zauberer = loadHero('zauberer').catch(() => null))); });
+    HEROES[id].then(H => {
+      if (!H || HA.want !== id) return;
+      for (const c of player.children) c.visible = false;
+      H.wrap.visible = true; HA.H = H; robeMat = H.mat; MOD.held = true; H.cur = null; play('idle', 0);
+    });
   }
   function play(k, fade = .2) {
-    const a = HA.act[k]; if (!a || HA.cur === a) return;
-    a.reset().play(); if (HA.cur) HA.cur.crossFadeTo(a, fade, false); HA.cur = a;
+    const H = HA.H, a = H.act[k]; if (!a || H.cur === a) return;
+    a.reset().play(); if (H.cur) H.cur.crossFadeTo(a, fade, false); H.cur = a;
   }
   function animHero(G) {
-    if (!HA.mixer) return;
+    if (!HA.H) return;
     const p = G.p, dt = Math.min(.1, Math.max(0, G.t - HA.t)); HA.t = G.t;
     const moved = Math.hypot(p.x - HA.x, p.y - HA.y); HA.x = p.x; HA.y = p.y;
-    const n = G.shots.length; if (n > HA.shots && HA.castT <= 0) HA.castT = .9; HA.shots = n;   // neue Geschosse → zaubern
+    const n = G.shots.length; if (n > HA.shots && HA.castT <= 0) HA.castT = 1.1; HA.shots = n;   // neue Geschosse → Angriff
     if (dt > 0) HA.castT -= dt;
     play(dt > 0 && moved > dt * 25 ? 'walk' : HA.castT > 0 ? 'cast' : 'idle');
-    HA.mixer.update(dt);
+    HA.H.mixer.update(dt);
   }
 
   async function loadModels() {
-    try { await loadAnimHero(); } catch (err) { console.info('Kein animierter Zauberer:', err.message); }
+    setHero(HA.want || 'zauberer');
     try {
-      const held = !MOD.held && await loadGlb('modelle/held.glb');
-      if (held) {
-        for (const c of player.children) c.visible = false;
-        const m = new THREE.Mesh(held.geo, held.mat); m.scale.setScalar(72); player.add(m);
-        MOD.held = held; robeMat = held.mat; robeMat.emissive = new THREE.Color('#000');
+      const kiste = await loadGlb('modelle/kiste.glb');
+      if (kiste) {   // Kiste: Breite 36 wie die alte Truhe, Deckel und Band entfallen
+        const bb = kiste.geo.boundingBox, w = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) || 1;
+        kiste.geo.scale(40 / w, 40 / w, 40 / w); I.chest.geometry.dispose(); I.chest.geometry = kiste.geo; I.chest.material = kiste.mat; MOD.kiste = kiste;
       }
       await Promise.all(Object.keys(FOE_K).map(async k => {
         const m = await loadGlb('modelle/' + k + '.glb'); if (!m) return;
@@ -228,12 +260,11 @@ const R3 = (() => {
   function render(G, W, H) {
     if (W !== lastW || H !== lastH) { ren.setSize(W, H, false); cam.aspect = W / H; cam.updateProjectionMatrix(); lastW = W; lastH = H; }
     const p = G.p, t = G.t;
-    cam.position.set(p.x, 400, p.y + 470); cam.lookAt(p.x, 20, p.y - 40);
-    ground.position.set(Math.round(p.x / 256) * 256, 0, Math.round(p.y / 256) * 256);
+    const ph = ht(p.x, p.y); cam.position.set(p.x, 400 + ph, p.y + 470); cam.lookAt(p.x, 20 + ph, p.y - 40);
     placeTrees(p);
 
     // Zauberer
-    player.position.set(p.x, HA.mixer ? 0 : Math.abs(Math.sin(t * 9)) * 3, p.y);
+    player.position.set(p.x, ph + (HA.H ? 0 : Math.abs(Math.sin(t * 9)) * 3), p.y);
     animHero(G);
     player.rotation.y = Math.atan2(p.dx, p.dy);
     robeMat.emissive.set(p.hurtT > 0 ? '#991b1b' : '#000');
@@ -293,9 +324,11 @@ const R3 = (() => {
       put(I.gem, ng, g.x, 8 + Math.sin(t * 4 + g.x) * 2, g.y, 1, 1, 1, t * 2 + g.y); col(I.gem, ng++, g.heal ? '#4ade80' : g.v >= 4 ? '#a78bfa' : '#22d3ee');
     }
     done(I.gem, ng); done(I.coin, nc);
-    let nk = 0; for (const c of G.chests) { for (const k of ['chest', 'lid', 'band']) put(I[k], nk, c.x, 0, c.y, 1, 1, 1, .3); put(I.shadow, sh++, c.x, .5, c.y, 24); nk++; }
-    for (const k of ['chest', 'lid', 'band']) done(I[k], nk);
+    let nk = 0; for (const c of G.chests) { for (const k of MOD.kiste ? ['chest'] : ['chest', 'lid', 'band']) put(I[k], nk, c.x, 0, c.y, 1, 1, 1, .3); put(I.shadow, sh++, c.x, .5, c.y, 24); nk++; }
+    for (const k of ['chest', 'lid', 'band']) done(I[k], MOD.kiste && k !== 'chest' ? 0 : nk);
 
+    stations.forEach((g, i) => { const st = (G.stations || [])[i]; g.visible = !!st; if (!st) return;
+      g.position.set(st.x, ht(st.x, st.y), st.y); g.userData.gem.position.y = 66 + Math.sin(t * 3 + i) * 5; g.userData.gem.rotation.y = t * 2; });
     let np = 0; for (const o of G.pools) put(I.pool, np++, o.x, 1, o.y, o.R, 1, o.R); done(I.pool, np);
     let nx = 0; for (const f of G.fx) { const k = 1 - f.life / f.max; put(I.fx, nx, f.x, 10, f.y, f.r * (.6 + k * .6), f.r * (.4 + k * .4), f.r * (.6 + k * .6)); col(I.fx, nx++, f.col); }
     done(I.fx, nx);
@@ -308,34 +341,34 @@ const R3 = (() => {
       const s = sl[i]; m.visible = !!s; if (!s) return;
       const key = Math.round(s.half * 100);
       if (!slashGeo[key]) slashGeo[key] = new THREE.RingGeometry(.35, 1, 24, 1, -s.half, s.half * 2).rotateX(-Math.PI / 2);
-      m.geometry = slashGeo[key]; m.position.set(s.x, 14, s.y); m.rotation.y = -s.a;
+      m.geometry = slashGeo[key]; m.position.set(s.x, 14 + ht(s.x, s.y), s.y); m.rotation.y = -s.a;
       const k = 1 - s.life / s.max; m.scale.setScalar(s.R * (.75 + .25 * k));
       m.material.opacity = .7 * (s.life / s.max); m.material.color.set(s.crit ? '#fde047' : '#f1f5f9');
     });
     const sw = p.w.schild;
-    if (sw && sw.layers > 0) { shield.visible = true; shield.position.set(p.x, 0, p.y); shield.scale.set(34, 52, 34); shield.material.opacity = .08 + .08 * sw.layers; }
+    if (sw && sw.layers > 0) { shield.visible = true; shield.position.set(p.x, ph, p.y); shield.scale.set(34, 52, 34); shield.material.opacity = .08 + .08 * sw.layers; }
     else shield.visible = false;
 
-    if (p.w.aura) { aura.visible = true; aura.position.set(p.x, 1, p.y); const R = p.w.aura.R || 60; aura.scale.set(R, 1, R); } else aura.visible = false;
+    if (p.w.aura) { aura.visible = true; aura.position.set(p.x, ph + 1, p.y); const R = p.w.aura.R || 60; aura.scale.set(R, 1, R); } else aura.visible = false;
 
     // Blitze als Linien
     const a = bolts.geometry.attributes.position.array; let v = 0;
     for (const b of G.bolts) for (let i = 1; i < b.pts.length && v < 597; i++) {
       const q0 = b.pts[i - 1], q1 = b.pts[i];
-      a.set([q0.x, 22, q0.y, q1.x + (Math.random() - .5) * 8, 18 + Math.random() * 8, q1.y + (Math.random() - .5) * 8], v * 3); v += 2;
+      a.set([q0.x, 22 + ht(q0.x, q0.y), q0.y, q1.x + (Math.random() - .5) * 8, 18 + Math.random() * 8 + ht(q1.x, q1.y), q1.y + (Math.random() - .5) * 8], v * 3); v += 2;
     }
     bolts.geometry.setDrawRange(0, v); bolts.geometry.attributes.position.needsUpdate = true;
 
     ren.render(scene, cam);
   }
 
-  function toScreen(x, y, h) { P.set(x, h, y).project(cam); return {x: (P.x + 1) / 2 * lastW, y: (1 - P.y) / 2 * lastH, vis: P.z < 1}; }
+  function toScreen(x, y, h) { P.set(x, h + ht(x, y), y).project(cam); return {x: (P.x + 1) / 2 * lastW, y: (1 - P.y) / 2 * lastH, vis: P.z < 1}; }
   function setLook(robe, hat) { if (MOD.held) return; robeMat.color.set(robe); hatMat.color.set(hat); }
   function setWorld(i) {
     if (!scene) return; const T = THEMES[i] || THEMES[0];
-    if (i !== worldNow) { const tex = grassTexture(T); tex.repeat.set(4096 / 256, 4096 / 256); ground.material.map.dispose(); ground.material.map = tex; ground.material.needsUpdate = true; worldNow = i; }
+    if (i !== worldNow) { const tex = grassTexture(T); tex.repeat.copy(ground.material.map.repeat); ground.material.map.dispose(); ground.material.map = tex; ground.material.needsUpdate = true; worldNow = i; }
     scene.background.set(T.sky); scene.fog.color.set(T.sky); hemi.groundColor.set(T.low);
     for (const k of ['pine', 'oak', 'bush', 'rock', 'trunk']) I[k].material.color.set(T[k]);
   }
-  return {init, render, toScreen, setLook, setWorld, collide, blocked};
+  return {init, render, toScreen, setLook, setHero, setWorld, collide, blocked, ARENA};
 })();

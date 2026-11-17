@@ -333,10 +333,10 @@ let G = null, mode = 'menu';
 function newGame(){
   const p = {x:0,y:0,r:14,hp:120,maxHp:120,regen:.5,speed:170,magnet:95,dmg:1,rate:1,count:0,size:1,crit:.05,luck:0,armor:0,
     w:{}, books:{}, items:{}, goldMul:1, xpMul:1, revive:0, lifesteal:0, thorns:0, castN:0, face:1, dx:1, dy:0, hurtT:0};
-  G = {p, t:0, en:[], shots:[], slashes:[], meteors:[], pools:[], gold:0, chests:[], opened:0, chestMode:false, goldMsgT:0, fx:[], gems:[], bolts:[], level:1, xp:0, need:xpNeed(1), pending:0, kills:0,
+  G = {p, t:0, en:[], shots:[], slashes:[], meteors:[], pools:[], gold:0, chests:[], stations:[], opened:0, chestMode:false, stationMode:false, goldMsgT:0, fx:[], gems:[], bolts:[], level:1, xp:0, need:xpNeed(1), pending:0, kills:0,
        spawnAcc:0, world:0, wt:0, bossOn:false, nextWorldT:0, streak:0, best:0, diff:1, recent:[], asked:new Set(), review:[], hist:[], wrongs:[], lastLuck:0, rrOk:0, lastOk:false, lastReroll:false, rerollQ:false, nums:[], dmgBy:{}, hurtGlow:0, luT:0, lastHit:'', eshots:[], won:false, winT:0, banish:2, banned:new Set()};
-  const C=choice.cls; G.cls=C; p.maxHp=p.hp=C.hp; p.speed*=C.spd; R3.setLook(C.robe, C.hat);
-  addWeapon(C.weapon); R3.setWorld(0);
+  const C=choice.cls; G.cls=C; p.maxHp=p.hp=C.hp; p.speed*=C.spd; R3.setLook(C.robe, C.hat); R3.setHero(C.id);
+  addWeapon(C.weapon); R3.setWorld(0); setupWorld();
   G.gold=prog.startGold||0; prog.startGold=0; saveProg();
   const A=areaProg(choice.area.id); G.due=choice.area.fragen.filter(f=>A.box[qKey(f)]!==undefined && A.box[qKey(f)]<=prog.runs && (choice.fmode!=='nur'||inFocus(f))).sort(()=>Math.random()-.5);
   if(G.due.length) setTimeout(()=>toast(`🔁 ${G.due.length} Frage${G.due.length>1?'n':''} aus früheren Runden kommen wieder`),400);
@@ -469,7 +469,7 @@ function spawn(type){
   const f=FOES[type], hm=1+G.t/DIFF.hp+(G.t/DIFF.hp2)**DIFF.pw, sm=Math.min(3.5,1+G.t/DIFF.sp);
   const big=f.boss, hp=big ? f.hp : f.hp*hm;   // Bosse: feste Lebenspunkte
   const e={type, x:p.x+Math.cos(a)*d, y:p.y+Math.sin(a)*d, r:f.r, hp, max:hp, sp:f.sp*(big?1:sm), dmg:f.dmg*(1+G.t/DIFF.dmg+(G.t/DIFF.dmg2)**2), xp:f.xp, col:f.col, flash:0, slow:0, ai:2.5, cd:1+Math.random()*2};
-  G.en.push(e); return e;
+  inArena(e, e.r); G.en.push(e); return e;
 }
 // Gegnerische Geschosse (Spam, Bosse)
 function eShoot(x,y,a,sp,dmg,col){ G.eshots.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,r:7,life:4.5,dmg,col}); }
@@ -490,7 +490,7 @@ function foeAI(e, dt, dx, dy, d){
   if(e.spiral>0){ e.spiral-=dt; e.sT=(e.sT||0)-dt; if(e.sT<=0){ e.sT=.09; e.sa=(e.sa||0)+.42; for(const o of [0,Math.PI]) eShoot(e.x,e.y,e.sa+o,170,e.dmg*.4,'#38bdf8'); } return true; }
   if(f.boss){
     // Weglaufen gilt nicht: zu weit weg, taucht der Boss wieder in deiner Nähe auf
-    if(d>700){ const a=Math.random()*Math.PI*2; e.x=p.x+Math.cos(a)*420; e.y=p.y+Math.sin(a)*420; G.fx.push({x:e.x,y:e.y,r:e.r*2.5,life:.4,max:.4,col:f.col}); }
+    if(d>700){ const a=Math.random()*Math.PI*2; e.x=p.x+Math.cos(a)*420; e.y=p.y+Math.sin(a)*420; inArena(e, e.r); G.fx.push({x:e.x,y:e.y,r:e.r*2.5,life:.4,max:.4,col:f.col}); }
     const ph2=e.hp<e.max*.5, k=ph2?.7:1; e.cd-=dt;
     if(e.cd<=0){ e.pat=(e.pat||0)+1;
       const pats=e.type==='tutor'?['dash','ring','summon','ring']:e.type==='abi'?['dash','spiral','summon','ring','split']:['dash','ring'], pat=pats[e.pat%pats.length];
@@ -508,13 +508,26 @@ function bossDown(e){
   if(e.type==='abi'){ G.won=true; G.winT=1.5; toast(`${BI.abi} ${BT.sieg}!`); return; }
   G.chests.push({x:e.x, y:e.y, free:true}); G.nextWorldT=3; toast(`🏁 ${WORLDS[G.world].name} geschafft! Gratis-Kiste – gleich geht es weiter.`);
 }
+// Arena: feste Kisten und Lernstationen je Welt (Startplatz frei, nie im Baum)
+const ARENA=R3.ARENA, CHESTS_PER_WORLD=10, STATIONS_PER_WORLD=3;
+const inArena = (o, m=30) => { o.x=Math.max(-ARENA+m,Math.min(ARENA-m,o.x)); o.y=Math.max(-ARENA+m,Math.min(ARENA-m,o.y)); };
+function freeSpot(minR, others, gap){
+  for(let k=0;k<200;k++){ const x=(Math.random()*2-1)*(ARENA-120), y=(Math.random()*2-1)*(ARENA-120);
+    if(Math.hypot(x,y)<minR || R3.blocked(x,y,40) || others.some(o=>Math.hypot(o.x-x,o.y-y)<gap)) continue; return {x,y}; }
+  return {x:(Math.random()*2-1)*ARENA*.8, y:(Math.random()*2-1)*ARENA*.8};
+}
+function setupWorld(){
+  const all=[]; G.chests=G.chests.filter(c=>c.free); G.stations=[];
+  for(let i=0;i<CHESTS_PER_WORLD;i++){ const c=freeSpot(300, all, 380); G.chests.push(c); all.push(c); }
+  for(let i=0;i<STATIONS_PER_WORLD;i++){ const s=freeSpot(500, all, 500); G.stations.push(s); all.push(s); }
+}
 // Weltwechsel: Gegner verschwinden, Kristalle fliegen zu dir, halbes Leben zurück
 function nextWorld(){
   const p=G.p; G.world++; G.wt=0; G.bossOn=false; G.warned=false;
   for(const e of G.en) G.fx.push({x:e.x,y:e.y,r:e.r*2,life:.3,max:.3,col:'#fff'});
   G.en=[]; G.eshots=[]; G.gems.forEach(g=>g.pull=true);
   p.hp=Math.min(p.maxHp, p.hp+p.maxHp*.5); p.inv=2; G.banish++;
-  R3.setWorld(G.world); const w=WORLDS[G.world]; toast(`${w.icon} Welt ${G.world+1}: ${w.name}`);
+  R3.setWorld(G.world); setupWorld(); const w=WORLDS[G.world]; toast(`${w.icon} Welt ${G.world+1}: ${w.name} – ${CHESTS_PER_WORLD} Kisten, ${STATIONS_PER_WORLD} Lernstationen`);
 }
 // Anfang sanft (linearer Teil), danach steigt es schnell (Potenz-Teil)
 // Welt 1 + Anfang Welt 2: ruhig lernen; danach steigt es steil (Potenz pw), Ende Welt 2 ist richtig schwer
@@ -547,7 +560,7 @@ function update(dt){
   const spd=Math.min(p.speed, 270);   // Obergrenze: sonst kann man allen Gegnern ewig davonlaufen
   p.x+=mx*spd*dt; p.y+=my*spd*dt; if(mx) p.face=Math.sign(mx);
   p.dashCd=(p.dashCd||0)-dt; if(p.dashT>0){ p.dashT-=dt; p.x+=p.dx*720*dt; p.y+=p.dy*720*dt; }
-  R3.collide(p, p.r);   // Bäume und Steine
+  R3.collide(p, p.r); inArena(p);   // Bäume, Steine und Bergrand
   { const cost=chestCost(); for(const c of G.chests) if(!c.free && G.gold<cost){   // Kiste ohne genug Gold: nicht durchlaufbar
     const dx=p.x-c.x, dy=p.y-c.y, d=Math.hypot(dx,dy), m=30; if(d<m && d>.01){ p.x=c.x+dx/d*m; p.y=c.y+dy/d*m; } } }
   if(mx||my){ const ll=Math.hypot(mx,my); p.dx=mx/ll; p.dy=my/ll; }
@@ -584,7 +597,7 @@ function update(dt){
   // Gegner
   for(let i=0;i<G.en.length;i++){ const e=G.en[i]; if(e.dead) continue;
     const dx=p.x-e.x, dy=p.y-e.y, d=Math.hypot(dx,dy)||1, sp=e.sp*(e.slow>0?(FOES[e.type].boss?.8:.5):1);
-    if(!foeAI(e,dt,dx,dy,d)){ e.x+=dx/d*sp*dt; e.y+=dy/d*sp*dt; } e.flash-=dt; e.slow-=dt; e.frostCd=(e.frostCd||0)-dt;
+    if(!foeAI(e,dt,dx,dy,d)){ e.x+=dx/d*sp*dt; e.y+=dy/d*sp*dt; } inArena(e, e.r); e.flash-=dt; e.slow-=dt; e.frostCd=(e.frostCd||0)-dt;
 
     for(let k=1;k<=6;k++){ const o=G.en[(i+k)%G.en.length]; if(o===e) continue; const ox=e.x-o.x, oy=e.y-o.y, od=Math.hypot(ox,oy), m=e.r+o.r;
       if(od>0&&od<m){ const f=(m-od)/2/od; e.x+=ox*f; e.y+=oy*f; } }
@@ -603,7 +616,7 @@ function update(dt){
       G.fx.push({x:p.x,y:p.y,r:220,life:.6,max:.6,col:'#fbbf24'}); toast('🪶 Phönixfeder – wiederbelebt!'); }
     else return gameOver();
   }
-  updChests(dt);
+  updChests(dt); if(mode==='play') updStations();
 
   // XP
   for(const g of G.gems){ const dx=p.x-g.x, dy=p.y-g.y, d=Math.hypot(dx,dy);
@@ -619,16 +632,20 @@ function update(dt){
 
   if(G.pending>0 && mode==='play' && G.luT<=0 && !(G.quizCD>0)) openQuiz();
 }
-// Kisten: es liegen immer ein paar in der Nähe; anlaufen + genug Gold = öffnen (erst Frage, dann Gegenstand)
+// Kisten: feste Anzahl je Welt (setupWorld); anlaufen + genug Gold = öffnen (erst Frage, dann Gegenstand)
 function updChests(dt){
   const p=G.p; G.goldMsgT-=dt;
-  G.chests=G.chests.filter(c=>(c.x-p.x)**2+(c.y-p.y)**2<1600*1600);
-  while(G.chests.length<3){ const a=Math.random()*Math.PI*2, d=450+Math.random()*500, x=p.x+Math.cos(a)*d, y=p.y+Math.sin(a)*d; if(!R3.blocked(x,y,30)) G.chests.push({x, y}); }
-  for(const c of G.chests){ let k=0; while(k++<8 && R3.blocked(c.x,c.y,24)) c.x+=40; }   // Kiste nie im Baum
+  for(const c of G.chests){ let k=0; while(k++<8 && R3.blocked(c.x,c.y,24)) c.x+=c.x>0?-40:40; inArena(c,40); }   // Kiste nie im Baum, nie im Berg
   const cost=chestCost(); if(G.gold>=cost) tip('chest');
   for(const c of G.chests){ if((c.x-p.x)**2+(c.y-p.y)**2 > 34*34) continue;
     if(c.free || G.gold>=cost){ if(!c.free){ G.gold-=cost; G.opened++; } G.chests.splice(G.chests.indexOf(c),1); G.chestMode=true; openQuiz(); return; }
     if(G.goldMsgT<=0){ toast(`📦 Kiste kostet ${cost} 🪙 – du hast ${G.gold}`); G.goldMsgT=2.5; } }
+}
+// Lernstation: anlaufen = schwere Frage; richtig = epische oder legendäre Belohnung, falsch = nichts
+function updStations(){
+  const p=G.p;
+  for(const st of G.stations){ const d=Math.hypot(st.x-p.x, st.y-p.y); if(d<450) tip('station');
+    if(d<34){ G.stations.splice(G.stations.indexOf(st),1); G.stationMode=true; G.fx.push({x:st.x,y:st.y,r:90,life:.5,max:.5,col:'#38bdf8'}); openQuiz(); return; } }
 }
 // Höchstens 2 Level-ups warten: Wer gerade viel einsammelt, bekommt keine Fragen-Lawine (die Leiste bleibt voll)
 function gainXp(v){ v*=G.p.xpMul+lvlBonus('xp'); G.xp+=v; if(G.pending>=2) G.xp=Math.min(G.xp,G.need); while(G.xp>=G.need && G.pending<2){ G.xp-=G.need; G.level++; G.need=xpNeed(G.level); G.pending++;
@@ -642,7 +659,7 @@ R3.init($('g3'));
 const DEMO={t:0, p:{x:0,y:0,dx:1,dy:0,hurtT:0,size:1,w:{frost:{pts:[]}}}, en:[], shots:[], gems:[], pools:[], fx:[], meteors:[], bolts:[], chests:[], cd:0};
 for(let i=0;i<16;i++){ const tp=['bug','bug','glitch','lock'][i%4], f=FOES[tp]; DEMO.en.push({type:tp,r:f.r,a:i/16*Math.PI*2,d:150+(i%3)*60,x:0,y:0,flash:0,slow:0}); }
 function demoTick(dt){
-  const D=DEMO, p=D.p; D.t+=dt; p.x+=45*dt;
+  const D=DEMO, p=D.p; D.t+=dt; p.x+=45*dt; if(p.x>ARENA-300) p.x=-ARENA+300;
   for(const e of D.en){ e.a+=dt*(e.type==='glitch'?.6:.3); e.x=p.x+Math.cos(e.a)*e.d; e.y=p.y+Math.sin(e.a)*e.d*.8; e.flash-=dt; }
   p.w.frost.pts=[0,1,2].map(k=>{ const a=D.t*2.4+k*2.09; return {x:p.x+Math.cos(a)*70,y:p.y+Math.sin(a)*70}; });
   D.cd-=dt; if(D.cd<=0){ D.cd=.7; const e=D.en[Math.floor(Math.random()*D.en.length)], a=Math.atan2(e.y-p.y,e.x-p.x);
@@ -691,22 +708,21 @@ function drawGlow(){
   if(G.luT>0){ const k=1-G.luT/.7; cx.save(); cx.globalAlpha=Math.min(1,G.luT*4); cx.textAlign='center'; cx.font=`900 ${Math.round(34+k*14)}px system-ui`;
     cx.lineWidth=6; cx.strokeStyle='#3a2a00'; cx.strokeText('LEVEL UP!',W/2,H*.38); cx.fillStyle='#fde047'; cx.fillText('LEVEL UP!',W/2,H*.38); cx.restore(); }
 }
-// Minikarte oben rechts: du in der Mitte (Pfeil = Laufrichtung), Kisten (gelb = bezahlbar), Bosse (rot, am Rand, wenn weiter weg)
-const MINI_RANGE=1700;
+// Minikarte oben rechts: die ganze Arena; du (Pfeil = Laufrichtung), Kisten (gelb = bezahlbar), Lernstationen (blau), Bosse (rot)
 function miniMap(cost){
-  const p=G.p, R=W<600?48:62, top=(document.querySelector('#hud .row')?.getBoundingClientRect().bottom||50)+8, mx=W-R-12, my=top+R, k=R/MINI_RANGE;
-  cx.save(); cx.beginPath(); cx.arc(mx,my,R,0,7); cx.fillStyle='#0b1220b8'; cx.fill(); cx.strokeStyle='#ffffff55'; cx.lineWidth=1.5; cx.stroke(); cx.clip();
-  cx.strokeStyle='#ffffff18'; cx.beginPath(); cx.arc(mx,my,R*.5,0,7); cx.stroke();
-  const pt=(x,y,edge)=>{ let dx=(x-p.x)*k, dy=(y-p.y)*k; const d=Math.hypot(dx,dy), m=R-7; if(d>m){ if(!edge) return null; dx*=m/d; dy*=m/d; } return [mx+dx,my+dy]; };
-  for(const e of G.en) if(e.type==='lock'){ const s=pt(e.x,e.y); if(s){ cx.fillStyle='#94a3b8'; cx.fillRect(s[0]-1.5,s[1]-1.5,3,3); } }
-  for(const c of G.chests){ const s=pt(c.x,c.y,true); if(!s) continue; cx.fillStyle=G.gold>=cost?'#fde047':'#a16207'; cx.strokeStyle='#000'; cx.lineWidth=1;
-    cx.fillRect(s[0]-4,s[1]-3.5,8,7); cx.strokeRect(s[0]-4,s[1]-3.5,8,7); }
+  const p=G.p, S=W<600?96:124, top=(document.querySelector('#hud .row')?.getBoundingClientRect().bottom||50)+8, x0=W-S-12, y0=top, k=S/(2*ARENA);
+  const pt=(x,y)=>[x0+(x+ARENA)*k, y0+(y+ARENA)*k];
+  cx.save(); cx.fillStyle='#0b1220b8'; cx.strokeStyle='#ffffff55'; cx.lineWidth=1.5; cx.beginPath(); cx.roundRect(x0,y0,S,S,8); cx.fill(); cx.stroke();
+  for(const c of G.chests){ const [sx,sy]=pt(c.x,c.y); cx.fillStyle=c.free?'#4ade80':G.gold>=cost?'#fde047':'#a16207'; cx.strokeStyle='#000'; cx.lineWidth=1;
+    cx.fillRect(sx-3.5,sy-3,7,6); cx.strokeRect(sx-3.5,sy-3,7,6); }
+  for(const st of G.stations){ const [sx,sy]=pt(st.x,st.y); cx.fillStyle='#38bdf8'; cx.strokeStyle='#fff'; cx.lineWidth=1;
+    cx.beginPath(); cx.moveTo(sx,sy-5); cx.lineTo(sx+4,sy); cx.lineTo(sx,sy+5); cx.lineTo(sx-4,sy); cx.closePath(); cx.fill(); cx.stroke(); }
   const blink=.6+.4*Math.sin(performance.now()/150);
-  for(const e of G.en) if(e.type==='boss'){ const s=pt(e.x,e.y,true); cx.fillStyle=`rgba(239,68,68,${blink})`; cx.beginPath(); cx.arc(s[0],s[1],6,0,7); cx.fill();
-    cx.fillStyle='#fff'; cx.font='bold 9px system-ui'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('B',s[0],s[1]+.5); cx.textBaseline='alphabetic'; }
-  const a=Math.atan2(p.dy||0,p.dx||1); cx.translate(mx,my); cx.rotate(a); cx.fillStyle='#38bdf8'; cx.strokeStyle='#fff'; cx.lineWidth=1.5;
-  cx.beginPath(); cx.moveTo(8,0); cx.lineTo(-5,-5.5); cx.lineTo(-2.5,0); cx.lineTo(-5,5.5); cx.closePath(); cx.fill(); cx.stroke();
+  for(const e of G.en) if(FOES[e.type].boss){ const [sx,sy]=pt(e.x,e.y); cx.fillStyle=`rgba(239,68,68,${blink})`; cx.beginPath(); cx.arc(sx,sy,5,0,7); cx.fill(); }
+  const [px,py]=pt(p.x,p.y), a=Math.atan2(p.dy||0,p.dx||1); cx.translate(px,py); cx.rotate(a); cx.fillStyle='#fff'; cx.strokeStyle='#0b1220'; cx.lineWidth=1.5;
+  cx.beginPath(); cx.moveTo(7,0); cx.lineTo(-4.5,-5); cx.lineTo(-2,0); cx.lineTo(-4.5,5); cx.closePath(); cx.stroke(); cx.fill();
   cx.restore();
+  cx.font='bold 11px system-ui'; cx.textAlign='right'; cx.fillStyle='#fff'; cx.fillText(`📦 ${G.chests.filter(c=>!c.free).length}  🏛️ ${G.stations.length}`, x0+S-4, y0+S+14);
 }
 let toastMsg='', toastT=0; function toast(m){ toastMsg=m; toastT=2.5; }
 function hud(){
@@ -725,7 +741,10 @@ function luckNow(){ return G.p.luck + 4 + Math.min(16, G.streak*2); }
 // Abstand zwischen zwei Level-up-Fragen: wächst mit dem Level (Level 5: 5 s, Level 15: 8 s, ab Level 26: 12 s)
 const luGap = () => Math.min(12, 3 + G.level*.35);
 function pickQuestion(){
-  const F=choice.area.fragen, due=G.review.findIndex(r=>r.due<=G.level);
+  const F=choice.area.fragen;
+  if(G.stationMode){ const L=focusActive()&&choice.fmode==='nur'?F.filter(inFocus):F;
+    for(const d of [3,2,1]){ const pool=L.filter(f=>f.d===d&&!G.asked.has(f)); if(pool.length){ const f=pool[Math.floor(Math.random()*pool.length)]; G.asked.add(f); return {f, again:false}; } } }
+  const due=G.review.findIndex(r=>r.due<=G.level);
   if(due>=0){ const r=G.review.splice(due,1)[0]; return {f:r.f, again:true}; }
   if(G.due && G.due.length){ const f=G.due.shift(); G.asked.add(f); return {f, again:true}; }
   // Schwerpunkt: nur Fragen der gewählten Themen, oder überwiegend (4 von 5)
@@ -782,7 +801,7 @@ function openQuiz(){
   const code=f.q.includes('\n'), readMs=Math.min(8000, Math.max(1500, f.q.length*28 + (code?2500:0)));
   Q={f, again, opts, reroll:!!G.rerollQ, t0:Infinity, read0:performance.now(), readMs, bonus:Math.max(8, 14 - G.t/60)*1000, done:false, shown:false};
   G.rerollQ=false;
-  $('qinfo').textContent=(G.chestMode?'📦 Kiste · ':'')+(again?'🔁 Wiederholung · ':'')+'Stufe '+'★'.repeat(f.d)+'☆'.repeat(3-f.d);
+  $('qinfo').textContent=(G.stationMode?'🏛️ Lernstation · schwere Frage · ':G.chestMode?'📦 Kiste · ':'')+(again?'🔁 Wiederholung · ':'')+'Stufe '+'★'.repeat(f.d)+'☆'.repeat(3-f.d);
   $('qluck').textContent=(G.streak?'🔥 Streak '+G.streak+' · ':'')+'⚡ schnell = mehr Glück';
   $('qtext').innerHTML=fmt(f.q)+qMedia(f);
   $('qans').classList.toggle('grid', opts.some(o=>typeof o.t==='object'));
@@ -802,6 +821,8 @@ $('qans').addEventListener('click', e=>{
   G.hist.push(o.ok); G.recent.push(o.ok); G.lastOk=o.ok; G.lastReroll=Q.reroll; if(o.ok&&Q.reroll) G.rrOk++;
   noteAnswer(Q.f, o.ok);
   $('box_q').classList.add(o.ok?'win':'lose'); if(o.ok) fxBurst(b, fast);
+  if(G.stationMode) $('qNext').textContent=o.ok?'🏛️ Belohnung wählen':'Weiter';
+  else $('qNext').textContent='Weiter zur Auswahl';
   if(o.ok){ G.streak++; if(G.streak===2) tip('streak'); G.best=Math.max(G.best,G.streak); G.lastLuck=luckNow()+(fast?3:0); }
   else { b.classList.add('bad'); G.streak=0; G.lastLuck=-1; G.review.push({f:Q.f, due:G.level+3}); if(!G.wrongs.includes(Q.f)) G.wrongs.push(Q.f); }
   const r3=G.recent.slice(-3);
@@ -811,7 +832,7 @@ $('qans').addEventListener('click', e=>{
   $('fb').style.display='block'; const nb=$('qNext'); nb.style.display='block'; nb.disabled=!o.ok;
   if(!o.ok) setTimeout(()=>nb.disabled=false, 1500);
 });
-$('qNext').onclick=()=>openPick();
+$('qNext').onclick=()=>{ if(G.stationMode && !G.lastOk){ G.stationMode=false; toast('🏛️ Die Lernstation erlischt – diesmal keine Belohnung.'); resume(); } else openPick(); };
 // Neu würfeln: nur nach richtiger Antwort und höchstens einmal je Auswahl; die Zusatzfrage zählt nicht für Punkte
 $('pkReroll').onclick=()=>{ G.rerollQ=true; openQuiz(); };
 // kleine Funken auf dem Antwortknopf
@@ -838,12 +859,15 @@ function openPick(){
   mode='pick'; const p=G.p, L=G.lastLuck, opts=[];
   const nW=Object.keys(p.w).length, nB=Object.keys(p.books).length, nI=Object.keys(p.items).length, chest=G.chestMode;
   const itemPool = ITEMS.filter(it=>p.items[it.id]?p.items[it.id]<MAX_ITEM_LVL:nI<SLOTS).map(it=>({kind:'item',it}));
-  const pool = chest && itemPool.length ? itemPool      // Gegenstände voll? Dann bietet die Kiste Waffen/Bücher an
+  const station=G.stationMode;
+  const pool = station ? [...itemPool, ...UPS.filter(u=>p.books[u.id]?p.books[u.id]<MAX_BOOK_LVL:nB<SLOTS).map(u=>({kind:'up',u})), ...Object.keys(WEAPONS).filter(id=>p.w[id]?p.w[id].lvl<MAX_WEP_LVL:nW<SLOTS).map(id=>({kind:'w',id}))]
+           : chest && itemPool.length ? itemPool      // Gegenstände voll? Dann bietet die Kiste Waffen/Bücher an
            : [...UPS.filter(u=>p.books[u.id]?p.books[u.id]<MAX_BOOK_LVL:nB<SLOTS).map(u=>({kind:'up',u})),
               ...Object.keys(WEAPONS).filter(id=>p.w[id]?p.w[id].lvl<MAX_WEP_LVL:nW<SLOTS).map(id=>({kind:'w',id}))];
   const keyOf=o=>o.kind+':'+(o.u?o.u.id:o.it?o.it.id:o.id); for(let i=pool.length-1;i>=0;i--) if(G.banned.has(keyOf(pool[i]))) pool.splice(i,1);
-  $('pkTitle').textContent = chest ? '📦 Kiste – wähle einen Gegenstand' : `⬆️ Level ${G.level} – wähle`;
-  while(opts.length<3 && pool.length){ const i=Math.floor(Math.random()*pool.length); opts.push({...pool.splice(i,1)[0], r:rollRarity(L)}); }
+  $('pkTitle').textContent = station ? '🏛️ Lernstation – wähle deine Belohnung' : chest ? '📦 Kiste – wähle einen Gegenstand' : `⬆️ Level ${G.level} – wähle`;
+  const roll = () => station ? Math.max(2, rollRarity(L)) : rollRarity(L);
+  while(opts.length<3 && pool.length){ const i=Math.floor(Math.random()*pool.length); opts.push({...pool.splice(i,1)[0], r:roll()}); }
   if(!opts.length) opts.push({kind:'heal', r:0});   // alles voll ausgebaut
   $('pkSlots').innerHTML=slotsHtml();
   modalHint('pkHint','pick','🃏 <b>Wähle eine Karte.</b> Waffen (🔥🌩️❄️…) greifen selbst an – bis zu 4 gleichzeitig. Bücher (📕📗…) verbessern deine Werte. Die <b>Farbe</b> zeigt die Seltenheit: grau, <span style="color:var(--r1)">blau</span>, <span style="color:var(--r2)">lila</span>, <span style="color:var(--r3)">gold</span> = immer stärker. Passt nichts? 🔄 unten gibt neue Karten gegen eine weitere Frage. Mit 🚫 verbannst du eine Karte für den Rest der Runde.');
@@ -860,15 +884,15 @@ function openPick(){
   $('pkCards').onclick=e=>{
     const bn=e.target.closest('.bn');
     if(bn){ const i=+bn.dataset.b; if(G.banish>0&&opts[i]){ G.banish--; G.banned.add(keyOf(opts[i])); opts.splice(i,1);
-        if(pool.length){ const j=Math.floor(Math.random()*pool.length); opts.push({...pool.splice(j,1)[0], r:rollRarity(L)}); } draw(); } return; }
+        if(pool.length){ const j=Math.floor(Math.random()*pool.length); opts.push({...pool.splice(j,1)[0], r:roll()}); } draw(); } return; }
     const b=e.target.closest('.card'); if(!b) return; const o=opts[+b.dataset.i], R=RAR[o.r];
     if(o.kind==='heal') p.hp=p.maxHp;
     else if(o.kind==='item'){ const l=p.items[o.it.id]||0, to=Math.min(MAX_ITEM_LVL,l+RAR[o.r].istep); for(let k=l;k<to;k++) o.it.ap(p,k+1); p.items[o.it.id]=to; }
     else if(o.kind==='up'){ o.u.ap(p, o.u.v*R.m); p.books[o.u.id]=(p.books[o.u.id]||0)+1; }
     else if(p.w[o.id]) p.w[o.id].lvl=Math.min(MAX_WEP_LVL, p.w[o.id].lvl+RAR[o.r].step); else { addWeapon(o.id); p.w[o.id].lvl=RAR[o.r].step; }
-    if(G.chestMode) G.chestMode=false; else G.pending--;
+    if(G.stationMode) G.stationMode=false; else if(G.chestMode) G.chestMode=false; else G.pending--;
     G.quizCD=luGap(); resume(); };   // weitere Level-ups kommen erst nach einer Pause (Hauptschleife)
-  $('pkReroll').style.display = (G.lastOk && !G.lastReroll) ? 'block' : 'none';
+  $('pkReroll').style.display = (G.lastOk && !G.lastReroll && !station) ? 'block' : 'none';
   show('ovPick');
 }
 
@@ -1001,6 +1025,7 @@ const TIPS = {
   streak:'🔥 <b>Streak!</b> Mehrere richtige Antworten hintereinander geben immer mehr 🍀 Glück auf seltene Karten.',
   boss:  '⚠️ Ein <b>Boss</b> kommt! Achte auf die <b>rote Linie</b> – dort stürmt er gleich hin – und weiche den Kugelringen aus. Besiegst du ihn, kommst du in die <b>nächste Welt</b> – dazu gibt es eine <b>Gratis-Kiste</b> und einen Heilkristall.',
   abi:   '',   // setzt applyBosses()
+  station:'🏛️ Eine <b>Lernstation</b>! Lauf hin: Es kommt eine <b>schwere Frage</b>. Richtig = <b>epische oder legendäre</b> Belohnung, falsch = nichts. Jede Station gibt es nur einmal.',
   chest: '📦 Du hast genug 🪙 Gold für eine <b>Kiste</b>! Lauf zu einer braunen Kiste: Erst kommt eine Frage, dann wählst du einen <b>Gegenstand</b> (4 Plätze, je bis Stufe 6).',
   more:  '⚔️ Tipp: Bis zu <b>4 Waffen</b> gleichzeitig. Eine neue Waffe bringt meist mehr als ein kleines Buch.',
 };
