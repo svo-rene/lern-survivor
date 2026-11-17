@@ -18,6 +18,8 @@ HELDEN = {            # Datei → Angriff aus der Meshy-Bibliothek
     'held_alchemist': 421,   # Alchemist: Over_Shoulder_Throw
     'held_ritter': 238,      # Ritter: Axe_Spin_Attack (Wirbelschwert)
     'held_gelehrter': 125,   # Gelehrte: Charged_Spell_Cast
+    'held_tueftler': 421,    # Tüftlerin: Over_Shoulder_Throw
+    'held_entdecker': 130,   # Entdecker: mage_soell_cast_1
 }
 
 
@@ -42,7 +44,7 @@ def rigge(name, angriff):
     rid = call('POST', BASE + '/rigging', {'model_url': uri, 'height_meters': 1.2})['result']
     warte(f'{BASE}/rigging/{rid}', 'Skelett')
     print(f'{name}: Bewegungen …')
-    aid = call('POST', BASE + '/animations', {'rig_task_id': rid, 'action_ids': [IDLE, WALK, angriff]})['result']
+    aid = call('POST', BASE + '/animations', {'rig_task_id': rid, 'action_ids': [IDLE, WALK, angriff, 516]})['result']
     ani = warte(f'{BASE}/animations/{aid}', 'Bewegungen')
     roh = laden(ani['result']['animation_glb_url'])
     klein = verkleinern(roh)

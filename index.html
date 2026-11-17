@@ -190,6 +190,7 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
   <h1>⏸ Pause</h1><div id="pauseInfo"></div>
   <button class="btn" id="resumeBtn">▶ Weiter</button>
   <button class="btn" id="pauseHeft" style="background:#334155;color:var(--ink);font-size:15px">📓 Hefter ansehen</button>
+  <div style="display:flex;gap:8px"><button class="btn" id="sndSfx" style="background:#334155;color:var(--ink);font-size:15px"></button><button class="btn" id="sndMus" style="background:#334155;color:var(--ink);font-size:15px"></button></div>
   <button class="btn" id="quitBtn" style="background:#3a1414;color:var(--ink);font-size:15px">⏹ Runde beenden</button>
 </div></div>
 
@@ -225,6 +226,7 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
 <script src="heft/automaten.js"></script><script src="heft/datenbank.js"></script><script src="heft/sicherheit.js"></script><script src="heft/kraefte.js"></script>
 <script src="vendor/three.min.js"></script>
 <script src="render3d.js"></script>
+<script src="sound.js"></script>
 <script>
 'use strict';
 // ================= Inhalte =================
@@ -240,6 +242,10 @@ const CLASSES = [
    scale:{armor:.01}, pas:'Zäh (170 Leben) · −1 % erlittener Schaden je Level (max. 75 %)', badge:l=>`🛡️ −${Math.min(75,l)}% Schaden`},
   {id:'gelehrter', icon:'🦉', name:'Gelehrte', weapon:'blitz', hp:110, spd:1, robe:'#1d4ed8', hat:'#1e3a8a',
    scale:{xp:.02}, pas:'+2 % Erfahrung je Level – mehr Level-ups, mehr Fragen', badge:l=>`📖 +${2*l}% EXP`},
+  {id:'tueftler', icon:'🔧', name:'Tüftlerin', weapon:'eule', hp:115, spd:1.02, robe:'#0f766e', hat:'#134e4a',
+   scale:{rate:.015}, pas:'Begleiterin · +1,5 % Angriffstempo je Level', badge:l=>`⚙️ +${Math.round(1.5*l)}% Angriff`},
+  {id:'entdecker', icon:'🧭', name:'Entdecker', weapon:'strahl', hp:125, spd:1.05, robe:'#a16207', hat:'#713f12',
+   scale:{crit:.008}, pas:'Flink · +0,8 % Krit-Chance je Level', badge:l=>`🎯 +${(0.8*l).toFixed(1)}% Krit`},
 ];
 // Drei Welten nacheinander: je WORLD_T Sekunden, dann kommt der Endboss der Welt. Boss besiegt = nächste Welt.
 const WORLDS = [
@@ -269,8 +275,26 @@ const WEAPONS = {
   gift:  {icon:'☠️', name:'Giftwolke', desc:'Hinterlässt Giftpfützen, die Gegner langsam zersetzen.'},
   klinge:{icon:'🪃', name:'Wirbelklinge', desc:'Fliegt hinaus und kehrt zurück – trifft auf beiden Wegen.'},
   schwert:{icon:'⚔️', name:'Wirbelschwert', desc:'Nahkampf: schlägt im Bogen vor dir zu und stößt Gegner zurück.'},
+  eule:  {icon:'🦉', name:'Eulenbegleiter', desc:'Eine Eule kreist um dich und wirft Federn auf Gegner.'},
+  strahl:{icon:'🔦', name:'Lichtstrahl', desc:'Ein Lichtstrahl dreht sich um dich und trifft alles auf seiner Linie.'},
+  welle: {icon:'🌊', name:'Flutwelle', desc:'Eine Welle rollt los, schiebt Gegner weg und trifft sie.'},
   schild:{icon:'🔰', name:'Schutzschild', desc:'Baut sich mit der Zeit auf. Jede Schicht fängt einen Treffer ab und stößt den Gegner weg.'},
 };
+// Superwaffen: Waffe auf Höchststufe + passendes Buch voll + Streak 5 → goldene Karte beim nächsten Level-up
+const EVO_STREAK = 5;
+const EVO = {
+  feuer:  {book:'schaden', icon:'☀️', name:'Sonnenstab',     txt:'Riesige Feuerbälle mit großer Explosion.'},
+  blitz:  {book:'krit',    icon:'⛈️', name:'Gewitterstab',   txt:'Blitze springen viel weiter und öfter.'},
+  frost:  {book:'groesse', icon:'🌨️', name:'Schneesturm',    txt:'Ein großer Ring aus Eis, der alles bremst.'},
+  aura:   {book:'regen',   icon:'💫', name:'Lebensaura',     txt:'Starke Aura, jeder Treffer heilt dich ein wenig.'},
+  meteor: {book:'menge',   icon:'🌠', name:'Sternenregen',   txt:'Viele Meteore auf einmal.'},
+  pfeile: {book:'tempo',   icon:'🌟', name:'Sternenpfeile',  txt:'Ein Pfeilhagel, der alles durchbohrt.'},
+  gift:   {book:'magnet',  icon:'🌫️', name:'Nebelsumpf',     txt:'Große Sümpfe, die lange bleiben.'},
+  klinge: {book:'laufen',  icon:'🌀', name:'Sturmklinge',    txt:'Viele Klingen wirbeln hinaus und zurück.'},
+  schwert:{book:'leben',   icon:'🗡️', name:'Heldenschwert',  txt:'Schlägt rundherum und heilt bei jedem Hieb.'},
+};
+const evoReady = id => { const w=G.p.w[id], E=EVO[id]; return w && !w.evo && E && w.lvl>=MAX_WEP_LVL && (G.p.books[E.book]||0)>=MAX_BOOK_LVL; };
+const wInfo = (id, w) => w && w.evo ? EVO[id] : WEAPONS[id];
 const UPS = [
   // Bücher: v = Grundwert, wird mit Seltenheit multipliziert
   {id:'schaden', icon:'📕', name:'Buch der Macht', v:.12, txt:v=>`+${pc(v)} Schaden`, ap:(p,v)=>p.dmg+=v},
@@ -333,10 +357,10 @@ let G = null, mode = 'menu';
 function newGame(){
   const p = {x:0,y:0,r:14,hp:120,maxHp:120,regen:.5,speed:170,magnet:95,dmg:1,rate:1,count:0,size:1,crit:.05,luck:0,armor:0,
     w:{}, books:{}, items:{}, goldMul:1, xpMul:1, revive:0, lifesteal:0, thorns:0, castN:0, face:1, dx:1, dy:0, hurtT:0};
-  G = {p, t:0, en:[], shots:[], slashes:[], meteors:[], pools:[], gold:0, chests:[], stations:[], opened:0, chestMode:false, stationMode:false, goldMsgT:0, fx:[], gems:[], bolts:[], level:1, xp:0, need:xpNeed(1), pending:0, kills:0,
+  G = {p, t:0, en:[], shots:[], slashes:[], meteors:[], pools:[], gold:0, chests:[], stations:[], loot:[], eliteT:35, opened:0, chestMode:false, stationMode:false, goldMsgT:0, fx:[], gems:[], bolts:[], level:1, xp:0, need:xpNeed(1), pending:0, kills:0,
        spawnAcc:0, world:0, wt:0, bossOn:false, nextWorldT:0, streak:0, best:0, diff:1, recent:[], asked:new Set(), review:[], hist:[], wrongs:[], lastLuck:0, rrOk:0, lastOk:false, lastReroll:false, rerollQ:false, nums:[], dmgBy:{}, hurtGlow:0, luT:0, lastHit:'', eshots:[], won:false, winT:0, banish:2, banned:new Set()};
   const C=choice.cls; G.cls=C; p.maxHp=p.hp=C.hp; p.speed*=C.spd; R3.setLook(C.robe, C.hat); R3.setHero(C.id);
-  addWeapon(C.weapon); R3.setWorld(0); setupWorld();
+  addWeapon(C.weapon); R3.setWorld(0); setupWorld(); SND.music(0);
   G.gold=prog.startGold||0; prog.startGold=0; saveProg();
   const A=areaProg(choice.area.id); G.due=choice.area.fragen.filter(f=>A.box[qKey(f)]!==undefined && A.box[qKey(f)]<=prog.runs && (choice.fmode!=='nur'||inFocus(f))).sort(()=>Math.random()-.5);
   if(G.due.length) setTimeout(()=>toast(`🔁 ${G.due.length} Frage${G.due.length>1?'n':''} aus früheren Runden kommen wieder`),400);
@@ -368,87 +392,110 @@ function updWeapons(dt){
   curSrc='';
 }
 function wTick(id, w, dt, p, rate, area){
-  {
+  { const lv = w.evo ? 14 : w.lvl;   // Superwaffe wirkt wie Stufe 14
     if(id==='feuer' && w.cd<=0){
       const t=nearest(p.x,p.y,520); if(!t){w.cd=.1;return;}
-      const n=1+p.count+Math.floor((w.lvl-1)/2), a0=Math.atan2(t.y-p.y,t.x-p.x);
+      const n=1+p.count+Math.floor((lv-1)/2), a0=Math.atan2(t.y-p.y,t.x-p.x);
       for(let i=0;i<n;i++){ const a=a0+(i-(n-1)/2)*.22, c=critRoll();
-        G.shots.push({x:p.x,y:p.y,vx:Math.cos(a)*400,vy:Math.sin(a)*400,life:1.4,r:7*p.size*(c>1?1.4:1),dmg:wDmg(14+w.lvl*5)*c,boom:42*p.size*(1+w.lvl*.1),crit:c>1}); }
-      w.cd = .85/(rate*(1+w.lvl*.08));
+        G.shots.push({x:p.x,y:p.y,vx:Math.cos(a)*400,vy:Math.sin(a)*400,life:1.4,r:7*p.size*(c>1?1.4:1),dmg:wDmg(14+lv*5)*c,boom:42*p.size*(1+lv*.1),crit:c>1}); }
+      w.cd = .85/(rate*(1+lv*.08));
     }
     if(id==='blitz' && w.cd<=0){
       let t=nearest(p.x,p.y,460); if(!t){w.cd=.1;return;}
-      const c=critRoll(), jumps=2+w.lvl+p.count, pts=[{x:p.x,y:p.y-10}], hit=new Set();
-      for(let j=0;j<jumps&&t;j++){ hit.add(t); pts.push({x:t.x,y:t.y}); hurt(t, wDmg(10+w.lvl*5)*c, c>1);
+      const c=critRoll(), jumps=2+lv+p.count, pts=[{x:p.x,y:p.y-10}], hit=new Set();
+      for(let j=0;j<jumps&&t;j++){ hit.add(t); pts.push({x:t.x,y:t.y}); hurt(t, wDmg(10+lv*5)*c, c>1);
         let nb=null,bd=(150*p.size)**2; for(const e of G.en){ if(hit.has(e)||e.dead)continue; const d=(e.x-t.x)**2+(e.y-t.y)**2; if(d<bd){bd=d;nb=e;} } t=nb; }
       G.bolts.push({pts, life:.18});
-      w.cd = 1.6/(rate*(1+w.lvl*.06));
+      w.cd = 1.6/(rate*(1+lv*.06));
     }
     if(id==='frost'){
-      const n=2+w.lvl+p.count, R=70*p.size+w.lvl*6; w.ang+=dt*(2.4+w.lvl*.15)*Math.min(2,rate);   // Eile: dreht schneller
+      const n=2+lv+p.count, R=70*p.size+lv*6; w.ang+=dt*(2.4+lv*.15)*Math.min(2,rate);   // Eile: dreht schneller
       w.pts=[]; for(let i=0;i<n;i++){ const a=w.ang+i*Math.PI*2/n; w.pts.push({x:p.x+Math.cos(a)*R,y:p.y+Math.sin(a)*R}); }
       for(const e of G.en){ for(const q of w.pts){ if((e.x-q.x)**2+(e.y-q.y)**2 < (e.r+9*p.size)**2 && (e.frostCd||0)<=0){
-        const c=critRoll(); hurt(e, wDmg(8+w.lvl*4)*c, c>1); e.slow=1.2; e.frostCd=.35/Math.min(2,rate); } } }
+        const c=critRoll(); hurt(e, wDmg(8+lv*4)*c, c>1); e.slow=1.2; e.frostCd=.35/Math.min(2,rate); } } }
     }
     if(id==='meteor' && w.cd<=0){
       const near=G.en.filter(e=>(e.x-p.x)**2+(e.y-p.y)**2<420*420); if(!near.length){w.cd=.2;return;}
-      const n=1+Math.floor(w.lvl/3)+p.count;
+      const n=1+Math.floor(lv/3)+p.count;
       for(let i=0;i<n;i++){ const t=near[Math.floor(Math.random()*near.length)], c=critRoll();
-        G.meteors.push({x:t.x,y:t.y,t:.55,max:.55,R:(55+w.lvl*7)*p.size,dmg:wDmg(30+w.lvl*12)*c}); }
-      w.cd = 2.6/(rate*(1+w.lvl*.06));
+        G.meteors.push({x:t.x,y:t.y,t:.55,max:.55,R:(55+lv*7)*p.size,dmg:wDmg(30+lv*12)*c}); }
+      w.cd = 2.6/(rate*(1+lv*.06));
     }
     if(id==='pfeile' && w.cd<=0){
-      const tg=nearest(p.x,p.y,480), n=1+p.count+Math.floor(w.lvl/3), a0=tg?Math.atan2(tg.y-p.y,tg.x-p.x):Math.atan2(p.dy,p.dx);
+      const tg=nearest(p.x,p.y,480), n=1+p.count+Math.floor(lv/3), a0=tg?Math.atan2(tg.y-p.y,tg.x-p.x):Math.atan2(p.dy,p.dx);
       for(let i=0;i<n;i++){ const a=a0+(i-(n-1)/2)*.12, c=critRoll();
-        G.shots.push({kind:'pfeil',x:p.x,y:p.y,vx:Math.cos(a)*580,vy:Math.sin(a)*580,life:1,r:5*p.size,dmg:wDmg(9+w.lvl*4)*c,pierce:1+Math.floor(w.lvl/2),hit:new Set(),crit:c>1}); }
-      w.cd = .75/(rate*(1+w.lvl*.06));
+        G.shots.push({kind:'pfeil',x:p.x,y:p.y,vx:Math.cos(a)*580,vy:Math.sin(a)*580,life:1,r:5*p.size,dmg:wDmg(9+lv*4)*c,pierce:1+Math.floor(lv/2),hit:new Set(),crit:c>1}); }
+      w.cd = .75/(rate*(1+lv*.06));
     }
     if(id==='gift' && w.cd<=0){
       const t=nearest(p.x,p.y,300), x=t?t.x:p.x, y=t?t.y:p.y;
       // Gift: stärker als früher, bremst; Vielzahl = mehr Pfützen rundherum
       for(let i=0;i<=p.count;i++){ const a=i*2.4, d=i?70*p.size:0;
-        G.pools.push({x:x+Math.cos(a)*d,y:y+Math.sin(a)*d,R:(48+w.lvl*7)*p.size,life:3+w.lvl*.3,tick:0,dmg:wDmg(7+w.lvl*4),slow:true}); }
-      w.cd = 2.4/(rate*(1+w.lvl*.05));
+        G.pools.push({x:x+Math.cos(a)*d,y:y+Math.sin(a)*d,R:(48+lv*7)*p.size,life:3+lv*.3,tick:0,dmg:wDmg(7+lv*4),slow:true}); }
+      w.cd = 2.4/(rate*(1+lv*.05));
     }
     if(id==='klinge' && w.cd<=0){
       const t=nearest(p.x,p.y,400); if(!t){w.cd=.2;return;}
-      const n=1+Math.floor((w.lvl-1)/3)+p.count, a0=Math.atan2(t.y-p.y,t.x-p.x);
+      const n=1+Math.floor((lv-1)/3)+p.count, a0=Math.atan2(t.y-p.y,t.x-p.x);
       for(let i=0;i<n;i++){ const a=a0+i*Math.PI*2/n, c=critRoll();
-        G.shots.push({kind:'klinge',x:p.x,y:p.y,vx:Math.cos(a)*480,vy:Math.sin(a)*480,life:3,age:0,r:13*p.size,dmg:wDmg(12+w.lvl*5)*c,pierce:99,hit:new Set(),crit:c>1}); }
-      w.cd = 1.7/(rate*(1+w.lvl*.06));
+        G.shots.push({kind:'klinge',x:p.x,y:p.y,vx:Math.cos(a)*480,vy:Math.sin(a)*480,life:3,age:0,r:13*p.size,dmg:wDmg(12+lv*5)*c,pierce:99,hit:new Set(),crit:c>1}); }
+      w.cd = 1.7/(rate*(1+lv*.06));
     }
     if(id==='schwert' && w.cd<=0){
-      const R=(75+w.lvl*7)*p.size*area, tg=nearest(p.x,p.y,R+60), a=tg?Math.atan2(tg.y-p.y,tg.x-p.x):Math.atan2(p.dy,p.dx);
-      const half=w.lvl>=8?Math.PI:w.lvl>=5?Math.PI*.5:Math.PI*.35, c=critRoll();
+      const R=(75+lv*7)*p.size*area, tg=nearest(p.x,p.y,R+60), a=tg?Math.atan2(tg.y-p.y,tg.x-p.x):Math.atan2(p.dy,p.dx);
+      const half=lv>=8?Math.PI:lv>=5?Math.PI*.5:Math.PI*.35, c=critRoll();
       for(const e of G.en){ const dx=e.x-p.x, dy=e.y-p.y, d=Math.hypot(dx,dy); if(d>R+e.r) continue;
         let da=Math.abs(Math.atan2(dy,dx)-a); if(da>Math.PI) da=2*Math.PI-da; if(da>half && d>e.r+p.r) continue;
-        hurt(e, wDmg(24+w.lvl*9)*c, c>1); knock(e, p, 34); }
+        hurt(e, wDmg(24+lv*9)*c, c>1); knock(e, p, 34); if(w.evo) p.hp=Math.min(p.maxHp, p.hp+.6); }
       G.slashes.push({x:p.x,y:p.y,a,half,R,life:.2,max:.2,crit:c>1});
-      w.cd = 1.05/(rate*(1+w.lvl*.06));
+      w.cd = 1.05/(rate*(1+lv*.06));
+    }
+    if(id==='eule'){   // Eulen kreisen um dich, werfen Federn auf den nächsten Gegner
+      const n=1+Math.floor(lv/4)+(p.count>1?1:0), R=62*p.size; w.ang=(w.ang||0)+dt*1.6; w.owls=[];
+      for(let i=0;i<n;i++){ const a=w.ang+i*Math.PI*2/n; w.owls.push({x:p.x+Math.cos(a)*R, y:p.y+Math.sin(a)*R}); }
+      if(w.cd<=0){ for(const o of w.owls){ const t=nearest(o.x,o.y,420); if(!t) continue; const a=Math.atan2(t.y-o.y,t.x-o.x), c=critRoll();
+          for(let k=0;k<1+Math.floor(p.count/2);k++){ const aa=a+(k-(Math.floor(p.count/2))/2)*.15;
+            G.shots.push({kind:'feder',x:o.x,y:o.y,vx:Math.cos(aa)*520,vy:Math.sin(aa)*520,life:1,r:5*p.size,dmg:wDmg(8+lv*4)*c,pierce:Math.floor(lv/3),hit:new Set(),crit:c>1}); } }
+        w.cd=.9/(rate*(1+lv*.06)); }
+    }
+    if(id==='strahl'){   // Lichtstrahl dreht sich und trifft alles auf der Linie
+      w.ang=(w.ang||0)+dt*(1.3+lv*.08)*Math.min(2,rate); const L=(170+lv*16)*p.size*area, rays=1+(lv>=6?1:0)+(p.count>1?1:0); w.beams=[];
+      for(let k=0;k<rays;k++){ const a=w.ang+k*Math.PI*2/rays; w.beams.push({x1:p.x,y1:p.y,x2:p.x+Math.cos(a)*L,y2:p.y+Math.sin(a)*L}); }
+      if(w.cd<=0){ const c=critRoll(); for(const b of w.beams){ const bx=b.x2-b.x1, by=b.y2-b.y1, bl=bx*bx+by*by;
+          for(const e of G.en){ const u=Math.max(0,Math.min(1,((e.x-b.x1)*bx+(e.y-b.y1)*by)/bl)), qx=b.x1+bx*u-e.x, qy=b.y1+by*u-e.y; if(qx*qx+qy*qy<(e.r+10*p.size)**2) hurt(e, wDmg(6+lv*3)*c, c>1); } }
+        w.cd=.2/Math.min(2,rate); }
+    }
+    if(id==='welle' && w.cd<=0){   // Welle in Laufrichtung (oder zum nächsten Gegner), schiebt weg
+      const t=nearest(p.x,p.y,500), a0=t?Math.atan2(t.y-p.y,t.x-p.x):Math.atan2(p.dy,p.dx), n=1+Math.floor(lv/4)+p.count;
+      for(let i=0;i<n;i++){ const a=a0+i*Math.PI*2/n, c=critRoll();
+        G.shots.push({kind:'welle',x:p.x,y:p.y,vx:Math.cos(a)*300,vy:Math.sin(a)*300,life:1.3,r:(26+lv*2)*p.size*area,dmg:wDmg(14+lv*6)*c,pierce:99,hit:new Set(),crit:c>1}); }
+      w.cd=2.2/(rate*(1+lv*.06));
     }
     if(id==='schild'){
       // Vielzahl = mehr Schichten, Eile = schneller nachladen; bricht eine Schicht, gibt es einen Schadensstoß (siehe update)
-      w.max=Math.min(6, 1+Math.floor(w.lvl/2.5)+p.count); w.layers=w.layers||0;
-      if(w.layers<w.max && w.cd<=0){ w.layers++; w.cd=Math.max(1.5, 5-w.lvl*.3)/Math.min(2,rate); }
+      w.max=Math.min(6, 1+Math.floor(lv/2.5)+p.count); w.layers=w.layers||0;
+      if(w.layers<w.max && w.cd<=0){ w.layers++; w.cd=Math.max(1.5, 5-lv*.3)/Math.min(2,rate); }
       if(w.layers>=w.max) w.cd=Math.max(w.cd,.5);
     }
     if(id==='aura'){
-      w.R = (60+w.lvl*10)*p.size*area;
-      if(w.cd<=0){ const c=critRoll(); for(const e of G.en) if((e.x-p.x)**2+(e.y-p.y)**2 < (w.R+e.r)**2) hurt(e, wDmg(5+w.lvl*4)*c, c>1); w.cd=.35/Math.min(2.2,rate); }
+      w.R = (60+lv*10)*p.size*area;
+      if(w.cd<=0){ const c=critRoll(); for(const e of G.en) if((e.x-p.x)**2+(e.y-p.y)**2 < (w.R+e.r)**2){ hurt(e, wDmg(5+lv*4)*c, c>1); if(w.evo) p.hp=Math.min(p.maxHp, p.hp+.15); } w.cd=.35/Math.min(2.2,rate); }
     }
   }
 }
 // curSrc = welche Waffe gerade Schaden macht (für die Bilanz am Ende)
 let curSrc='';
 function hurt(e,d,crit){
-  if(e.dead) return; const real=Math.min(d, Math.max(0,e.hp)); e.hp-=d; e.flash=.08;
+  if(e.dead) return; const real=Math.min(d, Math.max(0,e.hp)); e.hp-=d; e.flash=.08; SND.play('hit');
   if(curSrc) G.dmgBy[curSrc]=(G.dmgBy[curSrc]||0)+real;
   // Schadenszahl: kleine Treffer kurz hintereinander werden zusammengezählt
   if(e.num && e.num.t>.55 && !e.num.crit) { e.num.v+=d; e.num.t=.8; }
   else if(G.nums.length<45){ e.num={x:e.x,y:e.y,h:e.r*2+10,v:d,t:.8,crit:!!crit,boss:!!FOES[e.type].boss}; G.nums.push(e.num); }
-  if(e.hp<=0){ e.dead=true; G.kills++; tip('gem');
+  if(e.hp<=0){ e.dead=true; G.kills++; tip('gem'); SND.play('kill');
     G.fx.push({x:e.x,y:e.y,r:e.r*2.2,life:.22,max:.22,col:e.col});
     if(FOES[e.type].boss) bossDown(e);
+    if(e.elite){ G.chests.push({x:e.x, y:e.y, free:true}); dropLoot(e.x+40, e.y); toast('👑 Elite besiegt – Gratis-Kiste!'); }
+    else if(!FOES[e.type].boss && Math.random()<.006) dropLoot(e.x, e.y);
     if(e.type==='fork') for(let i=0;i<2;i++){ const m=spawn('bug'); m.x=e.x+(i?10:-10); m.y=e.y; m.r=8; m.hp=m.max=e.max*.35; m.xp=1; }
     const gd=GOLD_DROP[e.type]; if(Math.random()<gd[0]) G.gems.push({x:e.x+8,y:e.y-6,v:0,gold:gd[1]});
     if(G.p.lifesteal) G.p.hp=Math.min(G.p.maxHp, G.p.hp+G.p.lifesteal);
@@ -458,6 +505,24 @@ function hurt(e,d,crit){
 }
 
 // ================= Gegner =================
+// Elite-Gegner: ab und zu ein großer, goldener Gegner; besiegt = Gratis-Kiste und ein Fundstück
+function spawnElite(){
+  const pool=['bug','glitch','lock'].concat(G.world>=1?['spam','fork']:[], G.world>=2?['over']:[]), type=pool[Math.floor(Math.random()*pool.length)];
+  const e=spawn(type); e.elite=true; e.r*=1.7; e.hp=e.max=e.max*14+120; e.sp*=.85; e.dmg*=1.6; e.xp*=10;
+  toast(`👑 Ein Elite-${FOES[type].name} ist aufgetaucht – er trägt eine Kiste!`); SND.play('elite'); tip('elite');
+}
+// Fundstücke: 🧲 Magnet (alle Kristalle), 💣 Bombe (alle Gegner in der Nähe), 🧪 Heiltrank (halbes Leben)
+const LOOT = {magnet:{icon:'🧲', txt:'Magnet – alle Kristalle fliegen zu dir!'}, bombe:{icon:'💣', txt:'Bombe!'}, trank:{icon:'🧪', txt:'Heiltrank'}};
+function dropLoot(x, y, kind){ kind=kind||['magnet','bombe','trank'][Math.floor(Math.random()*3)]; G.loot.push({x, y, kind, t:40}); }
+function updLoot(dt){
+  const p=G.p;
+  for(const l of G.loot){ l.t-=dt; if((l.x-p.x)**2+(l.y-p.y)**2 > 30*30) continue; l.t=0; toast(`${LOOT[l.kind].icon} ${LOOT[l.kind].txt}`);
+    if(l.kind==='magnet'){ G.gems.forEach(g=>g.pull=true); SND.play('magnet'); }
+    if(l.kind==='trank'){ p.hp=Math.min(p.maxHp, p.hp+p.maxHp*.5); SND.play('heal'); }
+    if(l.kind==='bombe'){ curSrc='bombe'; for(const e of G.en) if((e.x-p.x)**2+(e.y-p.y)**2 < 650*650) hurt(e, FOES[e.type].boss||e.elite ? e.max*.1 : 99999); curSrc='';
+      G.fx.push({x:p.x,y:p.y,r:650,life:.6,max:.6,col:'#fde047'}); SND.play('bomb'); } }
+  G.loot=G.loot.filter(l=>l.t>0);
+}
 function spawn(type){
   const p=G.p, a=Math.random()*Math.PI*2, d=Math.hypot(W,H)/2+60;
   // mit der Zeit mehr schnelle Glitches – irgendwann holen sie jeden ein
@@ -476,7 +541,7 @@ function eShoot(x,y,a,sp,dmg,col){ G.eshots.push({x,y,vx:Math.cos(a)*sp,vy:Math.
 function hitPlayer(dmg, src){
   const p=G.p; if(p.inv>0) return;
   if(p.w.schild && p.w.schild.layers>0){ p.w.schild.layers--; p.inv=.25; G.fx.push({x:p.x,y:p.y,r:46,life:.25,max:.25,col:'#67e8f9'}); return; }
-  const hd=dmg*(1-Math.min(.75, p.armor+lvlBonus('armor'))); p.hp-=hd; p.hurtT=.12; p.inv=.15; G.hurtGlow=Math.min(1,G.hurtGlow+hd/12); G.lastHit=src; tip('hurt');
+  const hd=dmg*(1-Math.min(.75, p.armor+lvlBonus('armor'))); p.hp-=hd; p.hurtT=.12; p.inv=.15; SND.play('hurt'); G.hurtGlow=Math.min(1,G.hurtGlow+hd/12); G.lastHit=src; tip('hurt');
 }
 // Verhalten besonderer Gegner; gibt true zurück, wenn die normale Verfolgung entfällt
 function foeAI(e, dt, dx, dy, d){
@@ -525,9 +590,9 @@ function setupWorld(){
 function nextWorld(){
   const p=G.p; G.world++; G.wt=0; G.bossOn=false; G.warned=false;
   for(const e of G.en) G.fx.push({x:e.x,y:e.y,r:e.r*2,life:.3,max:.3,col:'#fff'});
-  G.en=[]; G.eshots=[]; G.gems.forEach(g=>g.pull=true);
+  G.en=[]; G.eshots=[]; G.loot=[]; G.eliteT=35; G.gems.forEach(g=>g.pull=true);
   p.hp=Math.min(p.maxHp, p.hp+p.maxHp*.5); p.inv=2; G.banish++;
-  R3.setWorld(G.world); setupWorld(); const w=WORLDS[G.world]; toast(`${w.icon} Welt ${G.world+1}: ${w.name} – ${CHESTS_PER_WORLD} Kisten, ${STATIONS_PER_WORLD} Lernstationen`);
+  R3.setWorld(G.world); setupWorld(); SND.music(G.world); const w=WORLDS[G.world]; toast(`${w.icon} Welt ${G.world+1}: ${w.name} – ${CHESTS_PER_WORLD} Kisten, ${STATIONS_PER_WORLD} Lernstationen`);
 }
 // Anfang sanft (linearer Teil), danach steigt es schnell (Potenz-Teil)
 // Welt 1 + Anfang Welt 2: ruhig lernen; danach steigt es steil (Potenz pw), Ende Welt 2 ist richtig schwer
@@ -542,7 +607,7 @@ addEventListener('keydown', e=>{
   keys[e.key.toLowerCase()]=true; if((e.key==='Escape'||e.key==='p')&&mode==='play') pause(); if((e.key===' '||e.key==='Shift')&&mode==='play'){ e.preventDefault(); dash(); } });
 $('dashBtn').addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); dash(); });
 // Ausweichen: kurzer Sprint in Laufrichtung, dabei unverwundbar
-function dash(){ if(mode!=='play'||!G) return; const p=G.p; if((p.dashCd||0)>0) return; p.dashCd=2.2; p.dashT=.22; p.inv=Math.max(p.inv||0,.4); G.fx.push({x:p.x,y:p.y,r:40,life:.3,max:.3,col:'#e0f2fe'}); }
+function dash(){ if(mode!=='play'||!G) return; const p=G.p; if((p.dashCd||0)>0) return; p.dashCd=2.2; p.dashT=.22; SND.play('dash'); p.inv=Math.max(p.inv||0,.4); G.fx.push({x:p.x,y:p.y,r:40,life:.3,max:.3,col:'#e0f2fe'}); }
 addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
 cv.addEventListener('pointerdown', e=>{ const db=$('dashBtn').getBoundingClientRect(); if(mode==='play' && Math.hypot(e.clientX-(db.left+db.width/2), e.clientY-(db.top+db.height/2))>db.width*.5+34) joy={ox:e.clientX,oy:e.clientY,x:e.clientX,y:e.clientY,id:e.pointerId}; });
 addEventListener('pointermove', e=>{ if(joy&&e.pointerId===joy.id){joy.x=e.clientX;joy.y=e.clientY;} });
@@ -571,8 +636,10 @@ function update(dt){
   if(G.nextWorldT>0){ G.nextWorldT-=dt; if(G.nextWorldT<=0) nextWorld(); }
   else { G.wt+=dt; const bt=WORLDS[G.world].boss;
     if(!G.warned && G.wt>=WORLD_T-10){ G.warned=true; toast(bt==='abi'?`${BI.abi} Gleich kommt ${lc1(FOES.abi.name)} – der letzte Endboss!`:`⚠️ Gleich kommt der Endboss: ${FOES[bt].name}!`); }
-    if(!G.bossOn && G.wt>=WORLD_T){ G.bossOn=true; spawn(bt); tip(bt==='abi'?'abi':'boss'); } }
+    if(!G.bossOn && G.wt>=WORLD_T){ G.bossOn=true; spawn(bt); SND.play('boss'); tip(bt==='abi'?'abi':'boss'); } }
   if(G.level>=6 && Object.keys(p.w).length<2) tip('more');
+  if(!G.bossOn && G.nextWorldT<=0){ G.eliteT-=dt; if(G.eliteT<=0){ G.eliteT=50+Math.random()*25; spawnElite(); } }
+  updLoot(dt);
 
   updWeapons(dt);
 
@@ -583,13 +650,14 @@ function update(dt){
     s.x+=s.vx*dt; s.y+=s.vy*dt; s.life-=dt;
     for(const e of G.en){ if(e.dead||(s.hit&&s.hit.has(e))) continue; if((e.x-s.x)**2+(e.y-s.y)**2 < (e.r+s.r)**2){
       curSrc=s.src||""; hurt(e,s.dmg,s.crit);
+      if(s.kind==='welle') knock(e, {x:s.x-s.vx*.2, y:s.y-s.vy*.2}, 55);
       if(s.hit){ s.hit.add(e); if(--s.pierce<0){ s.life=0; break; } continue; }
       s.life=0;
       for(const o of G.en) if(o!==e && (o.x-s.x)**2+(o.y-s.y)**2 < (s.boom+o.r)**2) hurt(o, s.dmg*.5);  curSrc="";
-      G.fx.push({x:s.x,y:s.y,r:s.boom,life:.25,max:.25,col:s.crit?'#fde047':'#fb923c'}); break; } } }
+      G.fx.push({x:s.x,y:s.y,r:s.boom,life:.25,max:.25,col:s.crit?'#fde047':'#fb923c'}); SND.play('boom'); break; } } }
   G.shots = G.shots.filter(s=>s.life>0);
   for(const m of G.meteors){ m.t-=dt; if(m.t<=0){ curSrc=m.src||""; for(const e of G.en) if((e.x-m.x)**2+(e.y-m.y)**2<(m.R+e.r)**2) hurt(e,m.dmg); curSrc="";
-    G.fx.push({x:m.x,y:m.y,r:m.R,life:.35,max:.35,col:'#f97316'}); } }
+    G.fx.push({x:m.x,y:m.y,r:m.R,life:.35,max:.35,col:'#f97316'}); SND.play('boom'); } }
   G.meteors = G.meteors.filter(m=>m.t>0);
   for(const o of G.pools){ o.life-=dt; o.tick-=dt; if(o.tick<=0){ o.tick=.4; curSrc=o.src||""; for(const e of G.en) if((e.x-o.x)**2+(e.y-o.y)**2<(o.R+e.r)**2){ hurt(e,o.dmg); if(o.slow) e.slow=Math.max(e.slow,.5); } curSrc=""; } }
   G.pools = G.pools.filter(o=>o.life>0);
@@ -604,7 +672,7 @@ function update(dt){
     if(d < e.r+p.r){
       if(p.inv>0){}   // gerade geschützt
       else if(p.w.schild && p.w.schild.layers>0){ p.w.schild.layers--; p.inv=.25; curSrc="schild"; const sd=wDmg(20+p.w.schild.lvl*8); for(const o of G.en) if((o.x-p.x)**2+(o.y-p.y)**2<(90*p.size)**2){ hurt(o,sd); knock(o,p,80); } curSrc=""; G.fx.push({x:p.x,y:p.y,r:46,life:.25,max:.25,col:'#67e8f9'}); }
-      else { const hd=e.dmg*dt*(1-Math.min(.75, p.armor+lvlBonus('armor'))); p.hp-=hd; p.hurtT=.12; G.hurtGlow=Math.min(1,G.hurtGlow+hd/12); G.lastHit=e.type; tip('hurt'); }
+      else { const hd=e.dmg*dt*(1-Math.min(.75, p.armor+lvlBonus('armor'))); p.hp-=hd; p.hurtT=.12; SND.play('hurt'); G.hurtGlow=Math.min(1,G.hurtGlow+hd/12); G.lastHit=e.type; tip('hurt'); }
       if(p.thorns){ curSrc="dornen"; hurt(e, p.thorns*dt); curSrc=""; } }
   }
   G.en = G.en.filter(e=>!e.dead);
@@ -621,7 +689,7 @@ function update(dt){
   // XP
   for(const g of G.gems){ const dx=p.x-g.x, dy=p.y-g.y, d=Math.hypot(dx,dy);
     if(d<p.magnet || g.pull){ g.pull=true; const s=Math.max(260,500-d)*dt; g.x+=dx/d*s; g.y+=dy/d*s; }
-    if(d<p.r+6){ g.got=true; if(g.heal) p.hp=p.maxHp; else if(g.gold) G.gold+=Math.round(g.gold*(p.goldMul+lvlBonus('gold'))); else gainXp(g.v); } }
+    if(d<p.r+6){ g.got=true; if(g.heal){ p.hp=p.maxHp; SND.play('heal'); } else if(g.gold){ G.gold+=Math.round(g.gold*(p.goldMul+lvlBonus('gold'))); SND.play('coin'); } else { gainXp(g.v); SND.play('gem'); } } }
   G.gems = G.gems.filter(g=>!g.got);
   if(G.gems.length>400) G.gems.splice(0,G.gems.length-400);
 
@@ -638,17 +706,17 @@ function updChests(dt){
   for(const c of G.chests){ let k=0; while(k++<8 && R3.blocked(c.x,c.y,24)) c.x+=c.x>0?-40:40; inArena(c,40); }   // Kiste nie im Baum, nie im Berg
   const cost=chestCost(); if(G.gold>=cost) tip('chest');
   for(const c of G.chests){ if((c.x-p.x)**2+(c.y-p.y)**2 > 34*34) continue;
-    if(c.free || G.gold>=cost){ if(!c.free){ G.gold-=cost; G.opened++; } G.chests.splice(G.chests.indexOf(c),1); G.chestMode=true; openQuiz(); return; }
+    if(c.free || G.gold>=cost){ if(!c.free){ G.gold-=cost; G.opened++; } G.chests.splice(G.chests.indexOf(c),1); G.chestMode=true; SND.play('chest'); openQuiz(); return; }
     if(G.goldMsgT<=0){ toast(`📦 Kiste kostet ${cost} 🪙 – du hast ${G.gold}`); G.goldMsgT=2.5; } }
 }
 // Lernstation: anlaufen = schwere Frage; richtig = epische oder legendäre Belohnung, falsch = nichts
 function updStations(){
   const p=G.p;
   for(const st of G.stations){ const d=Math.hypot(st.x-p.x, st.y-p.y); if(d<450) tip('station');
-    if(d<34){ G.stations.splice(G.stations.indexOf(st),1); G.stationMode=true; G.fx.push({x:st.x,y:st.y,r:90,life:.5,max:.5,col:'#38bdf8'}); openQuiz(); return; } }
+    if(d<34){ G.stations.splice(G.stations.indexOf(st),1); G.stationMode=true; SND.play('station'); G.fx.push({x:st.x,y:st.y,r:90,life:.5,max:.5,col:'#38bdf8'}); openQuiz(); return; } }
 }
 // Höchstens 2 Level-ups warten: Wer gerade viel einsammelt, bekommt keine Fragen-Lawine (die Leiste bleibt voll)
-function gainXp(v){ v*=G.p.xpMul+lvlBonus('xp'); G.xp+=v; if(G.pending>=2) G.xp=Math.min(G.xp,G.need); while(G.xp>=G.need && G.pending<2){ G.xp-=G.need; G.level++; G.need=xpNeed(G.level); G.pending++;
+function gainXp(v){ v*=G.p.xpMul+lvlBonus('xp'); G.xp+=v; if(G.pending>=2) G.xp=Math.min(G.xp,G.need); while(G.xp>=G.need && G.pending<2){ G.xp-=G.need; G.level++; G.need=xpNeed(G.level); G.pending++; SND.play('levelup');
   if(G.luT<=0){ G.luT=.7; G.fx.push({x:G.p.x,y:G.p.y,r:120,life:.6,max:.6,col:'#fde047'}); } } }
 
 // ================= Zeichnen =================
@@ -674,7 +742,7 @@ function draw(){
   const cost=chestCost(); cx.font='bold 14px system-ui'; cx.textAlign='center';
   for(const c of G.chests){ const s=R3.toScreen(c.x,c.y,48); if(!s.vis||s.x<-40||s.x>W+40||s.y<-20||s.y>H+20) continue;
     const ok=c.free||G.gold>=cost; cx.fillStyle='#000a'; cx.fillRect(s.x-34,s.y-16,68,20); cx.fillStyle=ok?'#fde047':'#cbd5e1'; cx.fillText(c.free?'🎁 GRATIS':`🪙 ${cost}`,s.x,s.y-1); }
-  for(const e of G.en) if(e.type==='lock'||e.type==='over'){ const s=R3.toScreen(e.x,e.y,e.r*2+12), w=36;
+  for(const e of G.en) if(e.type==='lock'||e.type==='over'||e.elite){ const s=R3.toScreen(e.x,e.y,e.r*2+12), w=36;
     cx.fillStyle='#0008'; cx.fillRect(s.x-w/2,s.y,w,5); cx.fillStyle='#ef4444'; cx.fillRect(s.x-w/2,s.y,w*e.hp/e.max,5); }
   // Warnlinie: hier stürmt der Gegner gleich hin
   for(const e of G.en) if(e.tele>0){ const a=R3.toScreen(e.x,e.y,4), b=R3.toScreen(e.tx+(e.tx-e.x)*.35,e.ty+(e.ty-e.y)*.35,4);
@@ -717,6 +785,8 @@ function miniMap(cost){
     cx.fillRect(sx-3.5,sy-3,7,6); cx.strokeRect(sx-3.5,sy-3,7,6); }
   for(const st of G.stations){ const [sx,sy]=pt(st.x,st.y); cx.fillStyle='#38bdf8'; cx.strokeStyle='#fff'; cx.lineWidth=1;
     cx.beginPath(); cx.moveTo(sx,sy-5); cx.lineTo(sx+4,sy); cx.lineTo(sx,sy+5); cx.lineTo(sx-4,sy); cx.closePath(); cx.fill(); cx.stroke(); }
+  for(const e of G.en) if(e.elite){ const [sx,sy]=pt(e.x,e.y); cx.fillStyle='#fbbf24'; cx.strokeStyle='#000'; cx.lineWidth=1; cx.beginPath(); cx.arc(sx,sy,4,0,7); cx.fill(); cx.stroke(); }
+  for(const l of G.loot){ const [sx,sy]=pt(l.x,l.y); cx.fillStyle='#f472b6'; cx.fillRect(sx-2,sy-2,4,4); }
   const blink=.6+.4*Math.sin(performance.now()/150);
   for(const e of G.en) if(FOES[e.type].boss){ const [sx,sy]=pt(e.x,e.y); cx.fillStyle=`rgba(239,68,68,${blink})`; cx.beginPath(); cx.arc(sx,sy,5,0,7); cx.fill(); }
   const [px,py]=pt(p.x,p.y), a=Math.atan2(p.dy||0,p.dx||1); cx.translate(px,py); cx.rotate(a); cx.fillStyle='#fff'; cx.strokeStyle='#0b1220'; cx.lineWidth=1.5;
@@ -820,9 +890,10 @@ $('qans').addEventListener('click', e=>{
   [...$('qans').children].forEach((x,i)=>{ if(Q.opts[i].ok) x.classList.add('ok'); });
   G.hist.push(o.ok); G.recent.push(o.ok); G.lastOk=o.ok; G.lastReroll=Q.reroll; if(o.ok&&Q.reroll) G.rrOk++;
   noteAnswer(Q.f, o.ok);
-  $('box_q').classList.add(o.ok?'win':'lose'); if(o.ok) fxBurst(b, fast);
+  $('box_q').classList.add(o.ok?'win':'lose'); SND.play(o.ok?'right':'wrong'); if(o.ok) fxBurst(b, fast);
   if(G.stationMode) $('qNext').textContent=o.ok?'🏛️ Belohnung wählen':'Weiter';
   else $('qNext').textContent='Weiter zur Auswahl';
+  if(o.ok && G.stationMode){ prog.stations=(prog.stations||0)+1; saveProg(); checkUnlocks(); }
   if(o.ok){ G.streak++; if(G.streak===2) tip('streak'); G.best=Math.max(G.best,G.streak); G.lastLuck=luckNow()+(fast?3:0); }
   else { b.classList.add('bad'); G.streak=0; G.lastLuck=-1; G.review.push({f:Q.f, due:G.level+3}); if(!G.wrongs.includes(Q.f)) G.wrongs.push(Q.f); }
   const r3=G.recent.slice(-3);
@@ -851,7 +922,7 @@ function slotsHtml(){
   const p=G.p, row=(list,max,label)=>`<div class="slots"><span class="sl-l">${label}</span>`+
     [...Array(SLOTS)].map((_,i)=>{ const it=list[i]; return it?`<span class="slot" title="${it.name}">${it.icon}<i>${it.lvl}${it.lvl>=max?'★':''}</i></span>`:'<span class="slot free"></span>'; }).join('')+
     `<span class="sl-f">${SLOTS-list.length} frei</span></div>`;
-  return row(Object.entries(p.w).map(([id,w])=>({icon:WEAPONS[id].icon,name:WEAPONS[id].name,lvl:w.lvl})), MAX_WEP_LVL, '⚔️')+
+  return row(Object.entries(p.w).map(([id,w])=>({icon:wInfo(id,w).icon,name:wInfo(id,w).name,lvl:w.evo?'⭐':w.lvl})), MAX_WEP_LVL, '⚔️')+
          row(Object.entries(p.books).map(([id,l])=>{ const u=UPS.find(x=>x.id===id); return {icon:u.icon,name:u.name,lvl:l}; }), MAX_BOOK_LVL, '📚')+
          row(Object.entries(p.items).map(([id,l])=>{ const u=ITEMS.find(x=>x.id===id); return {icon:u.icon,name:u.name,lvl:l}; }), MAX_ITEM_LVL, '🎒');
 }
@@ -860,33 +931,39 @@ function openPick(){
   const nW=Object.keys(p.w).length, nB=Object.keys(p.books).length, nI=Object.keys(p.items).length, chest=G.chestMode;
   const itemPool = ITEMS.filter(it=>p.items[it.id]?p.items[it.id]<MAX_ITEM_LVL:nI<SLOTS).map(it=>({kind:'item',it}));
   const station=G.stationMode;
-  const pool = station ? [...itemPool, ...UPS.filter(u=>p.books[u.id]?p.books[u.id]<MAX_BOOK_LVL:nB<SLOTS).map(u=>({kind:'up',u})), ...Object.keys(WEAPONS).filter(id=>p.w[id]?p.w[id].lvl<MAX_WEP_LVL:nW<SLOTS).map(id=>({kind:'w',id}))]
+  const pool = station ? [...itemPool, ...UPS.filter(u=>p.books[u.id]?p.books[u.id]<MAX_BOOK_LVL:nB<SLOTS).map(u=>({kind:'up',u})), ...Object.keys(WEAPONS).filter(id=>wOpen(id)&&(p.w[id]?p.w[id].lvl<MAX_WEP_LVL:nW<SLOTS)).map(id=>({kind:'w',id}))]
            : chest && itemPool.length ? itemPool      // Gegenstände voll? Dann bietet die Kiste Waffen/Bücher an
            : [...UPS.filter(u=>p.books[u.id]?p.books[u.id]<MAX_BOOK_LVL:nB<SLOTS).map(u=>({kind:'up',u})),
-              ...Object.keys(WEAPONS).filter(id=>p.w[id]?p.w[id].lvl<MAX_WEP_LVL:nW<SLOTS).map(id=>({kind:'w',id}))];
+              ...Object.keys(WEAPONS).filter(id=>wOpen(id)&&(p.w[id]?p.w[id].lvl<MAX_WEP_LVL:nW<SLOTS)).map(id=>({kind:'w',id}))];
   const keyOf=o=>o.kind+':'+(o.u?o.u.id:o.it?o.it.id:o.id); for(let i=pool.length-1;i>=0;i--) if(G.banned.has(keyOf(pool[i]))) pool.splice(i,1);
   $('pkTitle').textContent = station ? '🏛️ Lernstation – wähle deine Belohnung' : chest ? '📦 Kiste – wähle einen Gegenstand' : `⬆️ Level ${G.level} – wähle`;
   const roll = () => station ? Math.max(2, rollRarity(L)) : rollRarity(L);
   while(opts.length<3 && pool.length){ const i=Math.floor(Math.random()*pool.length); opts.push({...pool.splice(i,1)[0], r:roll()}); }
   if(!opts.length) opts.push({kind:'heal', r:0});   // alles voll ausgebaut
+  const evoId = !chest && !station && Object.keys(p.w).find(evoReady);
+  if(evoId && G.streak>=EVO_STREAK) opts[0]={kind:'evo', id:evoId, r:3};   // Superwaffe als goldene Karte
+  else if(evoId && !G.evoHint){ G.evoHint=true; toast(`⭐ ${EVO[evoId].icon} ${EVO[evoId].name} ist bereit – mit Streak ${EVO_STREAK} kommt sie als Karte!`); }
   $('pkSlots').innerHTML=slotsHtml();
   modalHint('pkHint','pick','🃏 <b>Wähle eine Karte.</b> Waffen (🔥🌩️❄️…) greifen selbst an – bis zu 4 gleichzeitig. Bücher (📕📗…) verbessern deine Werte. Die <b>Farbe</b> zeigt die Seltenheit: grau, <span style="color:var(--r1)">blau</span>, <span style="color:var(--r2)">lila</span>, <span style="color:var(--r3)">gold</span> = immer stärker. Passt nichts? 🔄 unten gibt neue Karten gegen eine weitere Frage. Mit 🚫 verbannst du eine Karte für den Rest der Runde.');
   const luckTxt=L<0?'✘ Falsch beantwortet: fast nur gewöhnliche Karten. Richtige Antworten bringen 🍀 Glück.':`🍀 Glück ${L} – je mehr Glück, desto öfter selten, episch, legendär.`;
   const draw=()=>{ $('pkLuck').textContent=luckTxt+(G.banish>0?` · 🚫 noch ${G.banish} Marke${G.banish>1?'n':''} zum Verbannen`:'');
   $('pkCards').innerHTML=opts.map((o,i)=>{ const R=RAR[o.r]; let ic,nm,tx;
     if(o.kind==='heal'){ ic='❤️‍🩹'; nm='Heiltrank'; tx='Alles ist voll ausgebaut – heilt dich vollständig.'; }
+    else if(o.kind==='evo'){ const E=EVO[o.id]; ic=E.icon; nm='⭐ SUPERWAFFE: '+E.name; tx=`${WEAPONS[o.id].icon} ${WEAPONS[o.id].name} wird zur Superwaffe. ${E.txt} Verdient mit Streak ${G.streak}!`; }
     else if(o.kind==='item'){ const l=p.items[o.it.id]||0, to=Math.min(MAX_ITEM_LVL,l+RAR[o.r].istep); ic=o.it.icon; nm=o.it.name+(l?` Lv ${to}/${MAX_ITEM_LVL}`:' (neu)');
       tx=o.it.txt+(to-l>1?` (×${to-l})`:'')+(l?'':` · belegt 1 von ${SLOTS-nI} freien Plätzen`); }
     else if(o.kind==='up'){ const b=p.books[o.u.id]; ic=o.u.icon; nm=o.u.name+(b?` Lv ${b+1}/${MAX_BOOK_LVL}`:' (neu)'); tx=o.u.txt(o.u.v*R.m)+(b?'':` · belegt 1 von ${SLOTS-nB} freien Buchplätzen`); }
     else { const W_=WEAPONS[o.id], w=p.w[o.id]; ic=W_.icon; nm=W_.name+(w?` Lv ${Math.min(MAX_WEP_LVL,w.lvl+RAR[o.r].step)}/${MAX_WEP_LVL}`:' (neu)'); tx=w?(RAR[o.r].step>1?`+${RAR[o.r].step} Stufen`:'+1 Stufe')+': mehr Schaden, mehr Wirkung':W_.desc+` · belegt 1 von ${SLOTS-nW} freien Waffenplätzen`; }
-    return `<button class="card r${o.r}" data-i="${i}"><span class="rl" style="color:var(--r${o.r})">${R.name}</span>${G.banish>0&&o.kind!=='heal'?`<span class="bn" data-b="${i}" title="Karte verbannen">🚫</span>`:''}<div class="big">${ic}</div><b>${nm}</b><small>${tx}</small></button>`; }).join(''); };
+    return `<button class="card r${o.r}" data-i="${i}"><span class="rl" style="color:var(--r${o.r})">${R.name}</span>${G.banish>0&&o.kind!=='heal'&&o.kind!=='evo'?`<span class="bn" data-b="${i}" title="Karte verbannen">🚫</span>`:''}<div class="big">${ic}</div><b>${nm}</b><small>${tx}</small></button>`; }).join(''); };
   draw();
   $('pkCards').onclick=e=>{
     const bn=e.target.closest('.bn');
     if(bn){ const i=+bn.dataset.b; if(G.banish>0&&opts[i]){ G.banish--; G.banned.add(keyOf(opts[i])); opts.splice(i,1);
         if(pool.length){ const j=Math.floor(Math.random()*pool.length); opts.push({...pool.splice(j,1)[0], r:roll()}); } draw(); } return; }
     const b=e.target.closest('.card'); if(!b) return; const o=opts[+b.dataset.i], R=RAR[o.r];
+    SND.play(o.kind==='evo'?'super':'pick');
     if(o.kind==='heal') p.hp=p.maxHp;
+    else if(o.kind==='evo'){ p.w[o.id].evo=true; toast(`⭐ ${EVO[o.id].icon} ${EVO[o.id].name}!`); }
     else if(o.kind==='item'){ const l=p.items[o.it.id]||0, to=Math.min(MAX_ITEM_LVL,l+RAR[o.r].istep); for(let k=l;k<to;k++) o.it.ap(p,k+1); p.items[o.it.id]=to; }
     else if(o.kind==='up'){ o.u.ap(p, o.u.v*R.m); p.books[o.u.id]=(p.books[o.u.id]||0)+1; }
     else if(p.w[o.id]) p.w[o.id].lvl=Math.min(MAX_WEP_LVL, p.w[o.id].lvl+RAR[o.r].step); else { addWeapon(o.id); p.w[o.id].lvl=RAR[o.r].step; }
@@ -906,7 +983,7 @@ function pause(){ mode='pause'; const a=G.hist.filter(Boolean).length;
   $('pauseInfo').innerHTML=`<p>Fragen: ${a} von ${G.hist.length} richtig · bester Streak ${G.best} · Schwierigkeit ${'★'.repeat(G.diff)}</p>`; show('ovPause'); }
 const FOE_NAME = t => t==='shot' ? 'eine Kugel' : (FOES[t]||{}).name || 'ein Gegner';
 function gameOver(win){
-  mode='over'; document.body.classList.remove('playing');
+  mode='over'; document.body.classList.remove('playing'); SND.music(-1); SND.play(win?'win':'over');
   if(G.tips){ store.set('ls_tips', false); $('tipsChk').checked=false; }   // Tipps nur beim ersten Spiel, per Häkchen wieder an
   const ok=G.hist.filter(Boolean).length, a=ok-G.rrOk, s=Math.floor(G.t), wd=G.world+(G.nextWorldT>0?1:0), bonus=(win?1000:0)+wd*300;
   prog.runs++; if(win) prog.wins++; saveProg(); checkUnlocks();
@@ -922,7 +999,7 @@ function gameOver(win){
   $('overBoard').innerHTML=boardHtml(entry.area, entry.id); renderBoard();
   $('overStats').innerHTML=`<div>⏱ ${fmtT(s)}</div><div>${WORLDS[G.world].icon} Welt ${G.world+1}/3</div><div>⬆️ Level ${G.level}</div><div>💥 ${G.kills} besiegt</div><div>✔ ${ok}/${G.hist.length} richtig</div><div>🔥 bester Streak ${G.best}</div><div>★ erreicht ${'★'.repeat(G.diff)}</div>`;
   const D=Object.entries(G.dmgBy).filter(([k])=>WEAPONS[k]||k==='dornen').sort((x,y)=>y[1]-x[1]), mx=D.length?D[0][1]:1;
-  $('overDmg').innerHTML=D.map(([k,v])=>{ const W_=WEAPONS[k]||{icon:'🌵',name:'Dornenmantel'}; return `<div class="dmgrow"><b>${W_.icon} ${W_.name}</b><i style="width:${Math.max(3,v/mx*100)}%"></i><span>${Math.round(v).toLocaleString('de-DE')}</span></div>`; }).join('')||'<p class="hint">–</p>';
+  $('overDmg').innerHTML=D.map(([k,v])=>{ const W_=(G.p.w[k]&&wInfo(k,G.p.w[k]))||WEAPONS[k]||{icon:'🌵',name:'Dornenmantel'}; return `<div class="dmgrow"><b>${W_.icon} ${W_.name}</b><i style="width:${Math.max(3,v/mx*100)}%"></i><span>${Math.round(v).toLocaleString('de-DE')}</span></div>`; }).join('')||'<p class="hint">–</p>';
   $('overWrong').innerHTML=G.wrongs.length?G.wrongs.map(f=>`<div class="wrong"><b>${fmt(f.q)}</b>${qMedia(f)}✔ ${ansHtml(f.a[0])}<br><span style="color:var(--mut)">${fmt(f.e)}</span></div>`).join(''):'<p>Nichts – alles richtig! 🎉</p>';
   retryInit(); $('overLearn').innerHTML=learnHtml(choice.area.id)+'<p class="hint">Beim nächsten Start kommen deine wackeligen Fragen zuerst dran.</p>';
   show('ovOver');
@@ -973,14 +1050,25 @@ function noteAnswer(f, ok){
   saveProg(); checkUnlocks();
 }
 // Klassen werden über Lernziele freigeschaltet (Zauberer ist immer offen)
-const UNLOCK = {};   // später: neue Klassen über Lernziele freischalten (z. B. {neu:{txt:'…', ok:()=>…}})
-const clsOpen = c => !UNLOCK[c.id] || prog.cls[c.id];
+// Freischaltungen über Lernziele (über alle Runden): Klassen und Waffen
+const UNLOCK = {
+  tueftler: {txt:'mit 50 richtigen Antworten', ok:()=>prog.totalOk>=50, st:()=>`${Math.min(50,prog.totalOk)}/50 richtig`},
+  entdecker:{txt:'mit 3 gelösten Lernstationen', ok:()=>(prog.stations||0)>=3, st:()=>`${Math.min(3,prog.stations||0)}/3 Stationen`},
+};
+const WUNLOCK = {
+  eule:  {txt:'mit der Tüftlerin', ok:()=>clsOpen(CLASSES.find(c=>c.id==='tueftler'))},
+  strahl:{txt:'mit dem Entdecker', ok:()=>clsOpen(CLASSES.find(c=>c.id==='entdecker'))},
+  welle: {txt:'mit Streak 10', ok:()=>prog.bestStreak>=10, st:()=>`bester Streak ${prog.bestStreak}/10`},
+};
+const wOpen = id => !WUNLOCK[id] || WUNLOCK[id].ok();
+const clsOpen = c => !UNLOCK[c.id] || !!prog.cls[c.id];
 function checkUnlocks(){
   let neu=false; for(const c of CLASSES){ const u=UNLOCK[c.id]; if(u && !prog.cls[c.id] && u.ok()){ prog.cls[c.id]=true; neu=true; if(G) toast(`🔓 Neue Klasse frei: ${c.icon} ${c.name}`); } }
+  prog.wpn=prog.wpn||{}; for(const id in WUNLOCK) if(!prog.wpn[id] && WUNLOCK[id].ok()){ prog.wpn[id]=true; neu=true; if(G && !UNLOCK[CLASSES.find(c=>c.weapon===id)?.id]) toast(`🔓 Neue Waffe frei: ${WEAPONS[id].icon} ${WEAPONS[id].name}`); }
   if(neu){ saveProg(); refreshClasses(); }
 }
 function refreshClasses(){
-  CLASSES.forEach(c=>{ c.off=!clsOpen(c); c.desc=c.off?`🔒 Frei ${UNLOCK[c.id].txt}.`:`Start: ${WEAPONS[c.weapon].icon} ${WEAPONS[c.weapon].name}. ${c.pas}`; });
+  CLASSES.forEach(c=>{ c.off=!clsOpen(c); c.desc=c.off?`🔒 Frei ${UNLOCK[c.id].txt} (${UNLOCK[c.id].st()}).`:`Start: ${WEAPONS[c.weapon].icon} ${WEAPONS[c.weapon].name}. ${c.pas}`; });
   if(!clsOpen(choice.cls)) choice.cls=CLASSES[0];
   if($('selClass').innerHTML) selList($('selClass'),CLASSES,'cls');
 }
@@ -1026,6 +1114,7 @@ const TIPS = {
   boss:  '⚠️ Ein <b>Boss</b> kommt! Achte auf die <b>rote Linie</b> – dort stürmt er gleich hin – und weiche den Kugelringen aus. Besiegst du ihn, kommst du in die <b>nächste Welt</b> – dazu gibt es eine <b>Gratis-Kiste</b> und einen Heilkristall.',
   abi:   '',   // setzt applyBosses()
   station:'🏛️ Eine <b>Lernstation</b>! Lauf hin: Es kommt eine <b>schwere Frage</b>. Richtig = <b>epische oder legendäre</b> Belohnung, falsch = nichts. Jede Station gibt es nur einmal.',
+  elite:'👑 Ein <b>Elite-Gegner</b>: groß, golden und zäh. Besiegst du ihn, lässt er eine <b>Gratis-Kiste</b> und ein Fundstück fallen.',
   chest: '📦 Du hast genug 🪙 Gold für eine <b>Kiste</b>! Lauf zu einer braunen Kiste: Erst kommt eine Frage, dann wählst du einen <b>Gegenstand</b> (4 Plätze, je bis Stufe 6).',
   more:  '⚔️ Tipp: Bis zu <b>4 Waffen</b> gleichzeitig. Eine neue Waffe bringt meist mehr als ein kleines Buch.',
 };
@@ -1058,7 +1147,7 @@ function applyBosses(){ const f=choice.fach.bosse?choice.fach:FAECHER[0];
   TIPS.abi=`${BI.abi} <b>${FOES.abi.name}</b> ist der letzte Endboss. Schaffst du diesen Kampf, hast du die Runde <b>geschafft</b>!`;
   $('pillEnd').textContent=`${BI.abi} zum Schluss: ${lc1(FOES.abi.name)}`; $('hintEnd').textContent=BI.abi;
   $('selMap').innerHTML=WORLDS.map((w,i)=>`<div class="card" style="cursor:default"><div class="big">${w.icon}</div><b>${i+1}. ${w.name}</b><small>${w.desc}</small></div>`).join(''); }
-refreshClasses(); selList($('selClass'),CLASSES,'cls'); applyBosses();
+checkUnlocks(); refreshClasses(); selList($('selClass'),CLASSES,'cls'); applyBosses();
 LERNBEREICHE.forEach(a=>a.desc=a.stufe+' · '+a.fragen.length+' Fragen');
 FAECHER.forEach(f=>{ const n=fachAreas(f).length; f.desc=f.stufe+' · '+n+' Lernbereich'+(n>1?'e':''); });
 const FAECHER_DA = FAECHER.filter(f=>fachAreas(f).length);
@@ -1098,6 +1187,8 @@ renderFocus();
 $('startBtn').onclick=start; $('againBtn').onclick=start;
 $('menuBtn').onclick=()=>{ G=null; mode='menu'; renderBoard(); updHeftInfo(); show('ovStart'); };
 $('quitBtn').onclick=()=>{ if(G) gameOver(false); };
+const sndLabel=()=>{ $('sndSfx').textContent=(SND.set.sfx?'🔊':'🔇')+' Geräusche'; $('sndMus').textContent=(SND.set.music?'🎵':'🔇')+' Musik'; };
+$('sndSfx').onclick=()=>{ SND.toggle('sfx'); sndLabel(); }; $('sndMus').onclick=()=>{ SND.toggle('music'); sndLabel(); }; sndLabel();
 $('pauseBtn').onclick=()=>{ if(mode==='play') pause(); }; $('resumeBtn').onclick=resume;
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&mode==='play') pause(); });
 for(const ev of ['blur','pagehide','orientationchange']) addEventListener(ev,()=>{ if(mode==='play') pause(); });

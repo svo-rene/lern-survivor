@@ -105,6 +105,10 @@ const R3 = (() => {
     inst('chest', new THREE.BoxGeometry(34, 22, 24).translate(0, 11, 0), lam('#92400e'), 16);   // je Welt 10 Kisten + Gratis-Kiste
     inst('lid', new THREE.CylinderGeometry(12, 12, 34, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).translate(0, 22, 0), lam('#b45309'), 16);   // je Welt 10 Kisten + Gratis-Kiste
     inst('band', new THREE.BoxGeometry(36, 4, 26).translate(0, 17, 0), lam('#fbbf24', {emissive: '#713f12'}), 16);   // je Welt 10 Kisten + Gratis-Kiste
+    inst('l_magnet', new THREE.TorusGeometry(9, 3.5, 6, 12, Math.PI).rotateZ(Math.PI).translate(0, 16, 0), lam('#ef4444'), 20);
+    inst('l_bombe', new THREE.SphereGeometry(10, 12, 8).translate(0, 11, 0), lam('#334155'), 20);
+    inst('l_trank', new THREE.CylinderGeometry(5, 8, 18, 10).translate(0, 9, 0), lam('#f472b6', {emissive: '#831843'}), 20);
+    inst('owl', new THREE.SphereGeometry(9, 10, 8).scale(1, 1.15, .9).translate(0, 0, 0), lam('#a16207', {emissive: '#3b2005'}), 12);
     inst('pool', new THREE.CylinderGeometry(1, 1, 1, 20), basic('#84cc16', {transparent: true, opacity: .35, depthWrite: false}), 40);
     inst('fx', new THREE.SphereGeometry(1, 12, 8), basic('#fff', {transparent: true, opacity: .45, depthWrite: false}), 120);
     inst('meteor', new THREE.DodecahedronGeometry(1, 0), lam('#78350f', {emissive: '#7c2d12'}), 20);
@@ -173,7 +177,7 @@ const R3 = (() => {
   }
   // Animierte Helden (modelle/<datei>_anim.glb von tools/meshy_rig.py): Clips Ruhe, Laufen, Angriff über den GLTFLoader.
   // Je Klasse ein Modell, wird erst beim Spielstart geladen; fehlt es, bleibt der Zauberer.
-  const HERO_FILE = {zauberer: 'held', jaeger: 'held_jaeger', alchemist: 'held_alchemist', ritter: 'held_ritter', gelehrter: 'held_gelehrter'};
+  const HERO_FILE = {zauberer: 'held', jaeger: 'held_jaeger', alchemist: 'held_alchemist', ritter: 'held_ritter', gelehrter: 'held_gelehrter', tueftler: 'held_tueftler', entdecker: 'held_entdecker'};
   const HEROES = {}, HA = {H: null, want: null, t: 0, x: 0, y: 0, castT: 0, shots: 0};
   async function loadHero(id) {
     const {GLTFLoader} = await import('./vendor/loaders/GLTFLoader.js');
@@ -249,7 +253,21 @@ const R3 = (() => {
     return true;
   }
 
+  const LOOT_FILE = {magnet: 'magnet', bombe: 'bombe', trank: 'trank'}, LOOT_COL = {magnet: '#ef4444', bombe: '#334155', trank: '#f472b6'};
+  let stationModel = null;
+  async function loadExtras() {
+    await Promise.all(Object.keys(LOOT_FILE).map(async k => { const m = await loadGlb('modelle/' + LOOT_FILE[k] + '.glb'); if (!m) return; m.geo.scale(26, 26, 26); I['l_' + k].geometry = m.geo; I['l_' + k].material = m.mat; }));
+    const owl = await loadGlb('modelle/begleiter.glb'); if (owl) { owl.geo.scale(26, 26, 26); owl.geo.translate(0, -13, 0); I.owl.geometry = owl.geo; I.owl.material = owl.mat; }
+    const st = await loadGlb('modelle/lernstation.glb');
+    if (st) { st.geo.scale(80, 80, 80); stationModel = st; stations.forEach(g => { g.children.forEach(c => { if (c !== g.userData.beam) c.visible = false; }); const m = new THREE.Mesh(st.geo, st.mat); g.add(m); }); }
+    for (const kind of Object.keys(MARK_H)) {
+      const m = await loadGlb('modelle/' + kind + '.glb'); if (!m) continue; m.geo.scale(MARK_H[kind], MARK_H[kind], MARK_H[kind]);
+      for (const k of MARKS) if (k.kind === kind) { const o = new THREE.Mesh(m.geo, m.mat); o.position.set(k.x, ht(k.x, k.z), k.z); o.rotation.y = k.ry; scene.add(o); }
+    }
+  }
+
   async function loadModels() {
+    loadEnv().catch(() => {}); loadExtras().catch(() => {});
     for (const k of ['tutor', 'abi']) loadBoss(k).catch(() => {});
     setHero(HA.want || 'zauberer');
     try {
@@ -270,11 +288,17 @@ const R3 = (() => {
   const cs = 110, SOLID = {pine: 15, oak: 15, rock: 13};   // Radius × Größe; Büsche kann man durchlaufen
   function deco(i, j) {
     if (Math.abs(i) <= 1 && Math.abs(j) <= 1) return null;   // Startplatz frei
+    for (const m of MARKS) if (Math.abs(m.x - i * cs - 40) < 150 && Math.abs(m.z - j * cs - 40) < 150) return null;   // Platz um Wahrzeichen
     const h = hash(i, j); if (h % 9) return null;
     return {x: i * cs + (h >>> 4) % 80, z: j * cs + (h >>> 11) % 80, s: .75 + ((h >>> 18) % 60) / 100, ry: (h >>> 7) % 6,
       kind: ['pine', 'oak', 'bush', 'rock', 'pine', 'oak', 'bush'][(h >>> 22) % 7]};
   }
+  // Wahrzeichen: feste Ruinen, Säulen und Eulenstatuen in der Arena (Orientierung), man kann nicht hindurch
+  const MARKS = [['ruine', -900, -700, .4], ['saeule', 700, -950, 0], ['eule', 950, 600, -.8], ['ruine', -600, 950, 2.2], ['saeule', -1150, 150, 1], ['eule', 250, -1200, 0], ['saeule', 1150, -200, .5], ['ruine', 450, 1100, 1.4]]
+    .map(([kind, x, z, ry]) => ({kind, x, z, ry, R: kind === 'ruine' ? 46 : 26}));
+  const MARK_H = {ruine: 120, saeule: 95, eule: 80};
   function solidNear(x, y, f) {
+    for (const m of MARKS) if (Math.abs(m.x - x) < 200 && Math.abs(m.z - y) < 200) f(m.x, m.z, m.R);
     const ci = Math.floor(x / cs), cj = Math.floor(y / cs);
     for (let j = cj - 1; j <= cj + 1; j++) for (let i = ci - 1; i <= ci + 1; i++) { const d = deco(i, j); if (d && SOLID[d.kind]) f(d.x, d.z, SOLID[d.kind] * d.s); }
   }
@@ -307,6 +331,8 @@ const R3 = (() => {
     if (dt > 0) for (const s of G.shots) {
       if (s.kind === 'pfeil') emit(s.x, 18, s.y, 0, 0, 0, .22, 10, s.crit ? '#fde047' : '#67e8f9');
       else if (s.kind === 'klinge') emit(s.x, 18, s.y, 0, 0, 0, .18, 14, '#e5e7eb');
+      else if (s.kind === 'feder') emit(s.x, 18, s.y, 0, 0, 0, .2, 8, '#fef3c7');
+      else if (s.kind === 'welle') { for (let k = 0; k < 2; k++) { const a = Math.random() * 6.283; emit(s.x + Math.cos(a) * s.r, 6, s.y + Math.sin(a) * s.r, 0, 50 + Math.random() * 40, 0, .4, 12, '#7dd3fc'); } }
       else { emit(s.x + (Math.random() - .5) * 6, 22, s.y + (Math.random() - .5) * 6, -s.vx * .08, 20 + Math.random() * 30, -s.vy * .08, .35, 16, s.crit ? '#fde047' : '#fb923c');
         if (Math.random() < .5) emit(s.x, 22, s.y, (Math.random() - .5) * 60, 40, (Math.random() - .5) * 60, .25, 7, '#fde68a'); }
     }
@@ -322,11 +348,18 @@ const R3 = (() => {
     for (const s of G.shots) {
       if (s.kind === 'pfeil') glow(s.x, 18, s.y, 26, s.crit ? '#fde047' : '#22d3ee', .9);
       else if (s.kind === 'klinge') glow(s.x, 18, s.y, s.r * 3, '#cbd5e1', .6);
+      else if (s.kind === 'feder') glow(s.x, 18, s.y, 18, '#fef3c7', .7);
+      else if (s.kind === 'welle') glow(s.x, 10, s.y, s.r * 2.6, '#38bdf8', .7);
       else { glow(s.x, 22, s.y, s.r * 7, s.crit ? '#fde047' : '#f97316'); glow(s.x, 22, s.y, s.r * 2.6, '#fff7d6'); }
     }
     for (const m of G.meteors) { const k = m.t / m.max; glow(m.x + 120 * k, 12 + 420 * k, m.y - 60 * k, 90, '#fb923c'); glow(m.x, 3, m.y, m.R * 1.4, '#f97316', .25 + .5 * (1 - k)); }
     for (const s of (G.eshots || [])) glow(s.x, 16, s.y, s.r * 4.5, s.col || '#f43f5e', .8);
+    for (const e of G.en) if (e.elite) { glow(e.x, 4, e.y, e.r * 5, '#fbbf24', .45 + .2 * Math.sin(t * 5)); if (dt > 0 && Math.random() < .3) emit(e.x + (Math.random() - .5) * e.r * 2, e.r, e.y + (Math.random() - .5) * e.r * 2, 0, 50, 0, .6, 8, '#fde047'); }
+    for (const l of (G.loot || [])) glow(l.x, 8, l.y, 60, LOOT_COL[l.kind] === '#334155' ? '#f97316' : LOOT_COL[l.kind], .5 + .2 * Math.sin(t * 4));
     for (const b of G.bolts) for (const q of b.pts) glow(q.x, 22, q.y, 46, '#7dd3fc', b.life / .18);
+    const sw2 = G.p.w && G.p.w.strahl; if (sw2 && sw2.beams) for (const b of sw2.beams) { const L = Math.hypot(b.x2 - b.x1, b.y2 - b.y1), k = Math.max(2, Math.ceil(L / 16));
+      for (let j = 1; j <= k; j++) { const u = j / k; glow(b.x1 + (b.x2 - b.x1) * u, 20, b.y1 + (b.y2 - b.y1) * u, 26 - 8 * u, '#fef08a', .8); } }
+    const ew = G.p.w && G.p.w.eule; if (ew && ew.owls) for (const o of ew.owls) glow(o.x, 40, o.y, 40, '#fde68a', .4);
     const fw = G.p.w && G.p.w.frost; if (fw && fw.pts) for (const q of fw.pts) glow(q.x, 20, q.y, 34, '#7dd3fc', .7);
     let nw = 0; for (const f of G.fx) { const k = f.life / f.max; glow(f.x, 14, f.y, f.r * (1.4 + (1 - k)), f.col, k * .9);
       if (nw < 120) { put(I.wave, nw, f.x, 2, f.y, f.r * (.3 + 1.1 * (1 - k)), 1, f.r * (.3 + 1.1 * (1 - k))); I.wave.setColorAt(nw++, C.set(f.col).multiplyScalar(k)); } }
@@ -366,7 +399,7 @@ const R3 = (() => {
         }
         if (bossAnim(e, s, ry)) { n[e.type]--; put(I.shadow, sh++, e.x, .5, e.y, r * 1.1); continue; }
         put(m, i, e.x, y, e.y, sx2, sy2, sz2, ry, rx, rz);
-        col(m, i, e.flash > 0 ? '#ffd4d4' : e.slow > 0 && !big ? '#9ddcff' : e.dash > 0 ? '#ffe9a8' : '#ffffff');
+        col(m, i, e.flash > 0 ? '#ffd4d4' : e.elite ? '#ffd166' : e.slow > 0 && !big ? '#9ddcff' : e.dash > 0 ? '#ffe9a8' : '#ffffff');
         put(I.shadow, sh++, e.x, .5, e.y, r * 1.1);
         continue;
       }
@@ -395,12 +428,15 @@ const R3 = (() => {
     // Geschosse
     let nf = 0, na = 0, nb = 0;
     for (const s of G.shots) {
-      if (s.kind === 'pfeil') { put(I.arrow, na, s.x, 18, s.y, 1, 1, 1, Math.atan2(s.vx, s.vy)); col(I.arrow, na++, s.crit ? '#fde047' : '#67e8f9'); }
+      if (s.kind === 'pfeil' || s.kind === 'feder') { put(I.arrow, na, s.x, 18, s.y, s.kind === 'feder' ? .7 : 1, s.kind === 'feder' ? .7 : 1, 1, Math.atan2(s.vx, s.vy)); col(I.arrow, na++, s.crit ? '#fde047' : s.kind === 'feder' ? '#f5f5f4' : '#67e8f9'); }
+      else if (s.kind === 'welle') { put(I.fire, nf, s.x, 8, s.y, s.r, s.r * .35, s.r); col(I.fire, nf++, s.crit ? '#fde047' : '#38bdf8'); }
       else if (s.kind === 'klinge') { put(I.blade, nb, s.x, 18, s.y, s.r, s.r, s.r, t * 18); col(I.blade, nb++, s.crit ? '#fde047' : '#e5e7eb'); }
       else { put(I.fire, nf, s.x, 22, s.y, s.r); col(I.fire, nf++, s.crit ? '#fde047' : '#fb923c'); }
     }
     done(I.fire, nf); done(I.arrow, na); done(I.blade, nb);
 
+    let no = 0; const ow = p.w.eule; if (ow && ow.owls) for (const o of ow.owls) put(I.owl, no++, o.x, 40 + Math.sin(t * 6 + o.x * .01) * 4, o.y, 1, 1, 1, t * 2);
+    done(I.owl, no);
     let nfr = 0; const fw = p.w.frost;
     if (fw && fw.pts) for (const q of fw.pts) put(I.frost, nfr++, q.x, 20, q.y, 7 * p.size, 11 * p.size, 7 * p.size, t * 4);
     done(I.frost, nfr);
@@ -417,6 +453,9 @@ const R3 = (() => {
 
     stations.forEach((g, i) => { const st = (G.stations || [])[i]; g.visible = !!st; if (!st) return;
       g.position.set(st.x, ht(st.x, st.y), st.y); g.userData.gem.position.y = 66 + Math.sin(t * 3 + i) * 5; g.userData.gem.rotation.y = t * 2; });
+    const nl = {magnet: 0, bombe: 0, trank: 0};
+    for (const l of (G.loot || [])) { const k = 'l_' + l.kind; if (nl[l.kind] < 20) put(I[k], nl[l.kind]++, l.x, 4 + Math.sin(t * 3 + l.x) * 3, l.y, 1, 1, 1, t * 1.5); }
+    for (const k in nl) done(I['l_' + k], nl[k]);
     let np = 0; for (const o of G.pools) put(I.pool, np++, o.x, 1, o.y, o.R, 1, o.R); done(I.pool, np);
     let nx = 0; for (const f of G.fx) { const k = 1 - f.life / f.max; put(I.fx, nx, f.x, 10, f.y, f.r * (.6 + k * .6), f.r * (.4 + k * .4), f.r * (.6 + k * .6)); col(I.fx, nx++, f.col); }
     done(I.fx, nx);
@@ -453,11 +492,29 @@ const R3 = (() => {
 
   function toScreen(x, y, h) { P.set(x, h + ht(x, y), y).project(cam); return {x: (P.x + 1) / 2 * lastW, y: (1 - P.y) / 2 * lastH, vis: P.z < 1}; }
   function setLook(robe, hat) { if (MOD.held) return; robeMat.color.set(robe); hatMat.color.set(hat); }
+  // Umgebung je Welt aus Meshy-Modellen (modelle/<w|d|e>_<baum|tanne|busch|fels>.glb); fehlt eins, bleibt die einfache Form
+  const ENV = {}, ENV_ORIG = {}, ENV_FILE = {oak: 'baum', pine: 'tanne', bush: 'busch', rock: 'fels'}, ENV_H = {oak: 92, pine: 110, bush: 26, rock: 26}, WPRE = ['w', 'd', 'e'];
+  function applyEnv() {
+    const T = THEMES[worldNow] || THEMES[0], pre = WPRE[worldNow] || 'w'; let any = false;
+    for (const k in ENV_FILE) {
+      const m = ENV[pre + '_' + k], o = ENV_ORIG[k] || (ENV_ORIG[k] = {geo: I[k].geometry, mat: I[k].material});
+      if (m) { I[k].geometry = m.geo; I[k].material = m.mat; if (k === 'oak' || k === 'pine') any = true; }
+      else { I[k].geometry = o.geo; I[k].material = o.mat; o.mat.color.set(T[k]); }
+    }
+    I.trunk.visible = !any; I.trunk.material.color.set(T.trunk);
+  }
+  async function loadEnv() {
+    await Promise.all(WPRE.flatMap(pre => Object.entries(ENV_FILE).map(async ([k, f]) => {
+      const m = await loadGlb('modelle/' + pre + '_' + f + '.glb'); if (!m) return;
+      m.geo.scale(ENV_H[k], ENV_H[k], ENV_H[k]); ENV[pre + '_' + k] = m;
+    })));
+    applyEnv();
+  }
   function setWorld(i) {
     if (!scene) return; const T = THEMES[i] || THEMES[0];
     if (i !== worldNow) { const tex = grassTexture(T); tex.repeat.copy(ground.material.map.repeat); ground.material.map.dispose(); ground.material.map = tex; ground.material.needsUpdate = true; worldNow = i; }
     scene.background.set(T.sky); scene.fog.color.set(T.sky); hemi.groundColor.set(T.low);
-    for (const k of ['pine', 'oak', 'bush', 'rock', 'trunk']) I[k].material.color.set(T[k]);
+    worldNow = i; applyEnv();
   }
   return {init, render, toScreen, setLook, setHero, setWorld, collide, blocked, ARENA};
 })();

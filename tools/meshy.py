@@ -17,6 +17,8 @@ MODELLE = {
     'held_alchemist': 'a young alchemist in a brown leather apron and goggles on the forehead, holding a bubbling green potion flask, arms slightly away from the body',
     'held_ritter': 'a young knight in shiny silver armor with a blue tabard, holding a sword, arms slightly away from the body',
     'held_gelehrter': 'a young female scholar in a long blue robe with round glasses and an owl emblem, holding a big book, arms slightly away from the body',
+    'held_tueftler': 'a young inventor girl with brass goggles, a teal overall and a big wrench in her hand, arms slightly away from the body',
+    'held_entdecker': 'a young explorer boy with a brown safari hat, a backpack and a glowing lantern in his hand, arms slightly away from the body',
     'kiste': 'a closed wooden treasure chest with golden metal bands and a golden lock, slightly cartoonish',
     'glitch': 'a small floating ghost creature, light purple, with a mischievous grin and little arms',
     'lock': 'a chunky grey rock golem creature with a grumpy face and short stubby legs',
@@ -27,6 +29,31 @@ MODELLE = {
     'tutor': 'a big ink bottle monster with ink splash arms and a quill pen stuck on top, funny face',
     'abi': 'a chubby purple dragon wearing a black graduation cap, small wings, proud smile',
 }
+# Umgebung, Deko, Fundstücke: eigener Stil und wenige Dreiecke (viele gleichzeitig) – (Prompt, Dreiecke)
+DSTIL = 'stylized low poly game asset, cute cartoon, bright colors, single object, no base, no background'
+DEKO = {
+    'w_baum':   ('a round leafy green cartoon tree with a short brown trunk', 900),
+    'w_tanne':  ('a tall green cartoon pine tree', 700),
+    'w_busch':  ('a dense round leafy bright green shrub with small pink flowers on top, solid shape', 600),
+    'w_fels':   ('a grey boulder with patches of green moss', 400),
+    'd_baum':   ('a tall green saguaro cactus with two arms', 600),
+    'd_tanne':  ('a desert palm tree with a curved trunk', 900),
+    'd_busch':  ('a small round dry olive green desert shrub, solid compact shape', 600),
+    'd_fels':   ('a red sandstone rock formation', 400),
+    'e_baum':   ('a frosted round tree covered in snow and ice', 900),
+    'e_tanne':  ('a pine tree covered in snow', 700),
+    'e_busch':  ('a small snowy bush with blue ice crystals', 500),
+    'e_fels':   ('a cluster of glowing light blue ice crystals', 400),
+    'ruine':    ('an ancient stone archway ruin overgrown with ivy', 1500),
+    'saeule':   ('a broken ancient stone column with moss', 800),
+    'eule':     ('a stone owl statue on a pedestal', 1500),
+    'lernstation': ('a stone lectern with an open glowing magic book and a floating blue crystal above it', 2000),
+    'magnet':   ('a red and silver horseshoe magnet', 400),
+    'trank':    ('a round glass potion bottle with red liquid and a heart label, cork stopper', 400),
+    'bombe':    ('a round black cartoon bomb with a lit fuse', 400),
+    'begleiter': ('a small cute brown owl with big eyes, wings spread, flying', 500),
+}
+MODELLE.update({k: v for k, v in DEKO.items()})
 POLY = 4000      # Dreiecke je Modell (viele Gegner gleichzeitig, auch auf Tablets)
 TEX = 512        # Kantenlänge der Textur in Pixeln
 
@@ -88,12 +115,14 @@ def verkleinern(glb):
 
 
 def erzeuge(name, prompt):
+    poly, stil = POLY, STIL
+    if isinstance(prompt, tuple): prompt, poly, stil = prompt[0], prompt[1], DSTIL
     glb_pfad = os.path.join(ZIEL, name + '.glb')
     if os.path.exists(glb_pfad) and len(sys.argv) < 2:
         print(f'{name}: schon da, übersprungen'); return
     print(f'{name}: Vorschau …')
-    pid = call('POST', API, {'mode': 'preview', 'prompt': f'{prompt}, {STIL}', 'art_style': 'realistic',
-                             'topology': 'triangle', 'target_polycount': POLY, 'should_remesh': True})['result']
+    pid = call('POST', API, {'mode': 'preview', 'prompt': f'{prompt}, {stil}', 'art_style': 'realistic',
+                             'topology': 'triangle', 'target_polycount': poly, 'should_remesh': True})['result']
     warte(pid, 'Form')
     print(f'{name}: Textur …')
     rid = call('POST', API, {'mode': 'refine', 'preview_task_id': pid, 'enable_pbr': False})['result']
