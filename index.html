@@ -49,6 +49,9 @@ p{margin:6px 0;line-height:1.4}
 .btn:disabled{opacity:.4}
 #qtext{font-size:19px;font-weight:700;margin:8px 0 12px;line-height:1.35}
 code{background:#0006;padding:1px 5px;border-radius:5px;font-family:Consolas,monospace;color:#a7f3d0}
+.frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 .15em;line-height:1.2;font-size:1em}
+.frac>span{padding:0 .25em;white-space:nowrap} .frac>span:first-child{border-bottom:1.5px solid currentColor}
+sub{font-size:.7em}
 pre.code{background:#0008;color:#a7f3d0;font:15px/1.45 Consolas,monospace;padding:10px 12px;border-radius:10px;margin:10px 0 0;white-space:pre;overflow-x:auto;text-align:left}
 .ans{display:block;width:100%;text-align:left;margin:7px 0;padding:12px;border-radius:10px;border:2px solid var(--line);background:#0e1914;color:var(--ink);font:inherit;font-size:16px;cursor:pointer}
 .ans.ok{border-color:var(--ok);background:#0f3320} .ans.bad{border-color:var(--bad);background:#3a1414}
@@ -132,6 +135,7 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
   </header>
   <div class="box sbox">
     <h2>Dein Spitzname</h2><input id="nick" maxlength="16" placeholder="z. B. Bitzauberer" autocomplete="off" spellcheck="false">
+    <div id="fachBox"><h2>Fach</h2><div class="cards" id="selFach"></div></div>
     <h2>Lernbereich</h2><div class="cards" id="selArea"></div>
     <details id="focusBox" class="focus"><summary id="focusSum">🎯 Schwerpunkt wählen (optional)</summary>
       <p class="hint">Wähle Themen aus diesem Lernbereich – dann kommen überwiegend oder nur Fragen dazu.</p>
@@ -209,11 +213,11 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
 </div></div>
 <button id="dashBtn" aria-label="Ausweichen">💨</button>
 
-<script src="kurs/python.js"></script><script src="kurs/algo.js"></script><script src="kurs/daten.js"></script><script src="kurs/ki.js"></script><script src="kurs/technik.js"></script><script src="kurs/oop.js"></script><script src="kurs/netze.js"></script><script src="kurs/automaten.js"></script><script src="kurs/datenbank.js"></script><script src="kurs/sicherheit.js"></script>
+<script src="kurs/python.js"></script><script src="kurs/algo.js"></script><script src="kurs/daten.js"></script><script src="kurs/ki.js"></script><script src="kurs/technik.js"></script><script src="kurs/oop.js"></script><script src="kurs/netze.js"></script><script src="kurs/automaten.js"></script><script src="kurs/datenbank.js"></script><script src="kurs/sicherheit.js"></script><script src="kurs/kraefte.js"></script>
 <script src="kurs.js"></script>
 <script src="heft/python.js"></script><script src="heft/algo.js"></script><script src="heft/daten.js"></script>
 <script src="heft/ki.js"></script><script src="heft/technik.js"></script><script src="heft/oop.js"></script><script src="heft/netze.js"></script>
-<script src="heft/automaten.js"></script><script src="heft/datenbank.js"></script><script src="heft/sicherheit.js"></script>
+<script src="heft/automaten.js"></script><script src="heft/datenbank.js"></script><script src="heft/sicherheit.js"></script><script src="heft/kraefte.js"></script>
 <script src="vendor/three.min.js"></script>
 <script src="render3d.js"></script>
 <script>
@@ -304,7 +308,14 @@ let W=0, H=0;
 function resize(){ const d=Math.min(devicePixelRatio||1, 2); W=innerWidth; H=innerHeight; cv.width=W*d; cv.height=H*d; cx.setTransform(d,0,0,d,0,0); }
 addEventListener('resize', resize); resize();
 
-const choice = {cls:CLASSES[0], area:LERNBEREICHE[0], focus:new Set(), ft:new Set(), fmode:'nur'};
+// Fach: ?fach=physik im Link legt es fest (dann keine Fachauswahl), sonst die letzte Wahl auf diesem Gerät
+const fachAreas = f => LERNBEREICHE.filter(a=>a.fach===f.id);
+const lsGet = (k,d) => { try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } };
+const FACH_FIX = (()=>{ const q=new URLSearchParams(location.search), b=LERNBEREICHE.find(a=>a.id===q.get('bereich'));
+  return FAECHER.find(f=>f.id===(q.get('fach')||(b&&b.fach)) && fachAreas(f).length); })();
+const choice = {cls:CLASSES[0], focus:new Set(), ft:new Set(), fmode:'nur'};
+choice.fach = FACH_FIX || FAECHER.find(f=>f.id===lsGet('ls_fach','') && fachAreas(f).length) || FAECHER.find(f=>fachAreas(f).length);
+choice.area = fachAreas(choice.fach).find(a=>a.id===lsGet('ls_area_'+choice.fach.id,'')) || fachAreas(choice.fach)[0];
 let G = null, mode = 'menu';
 
 function newGame(){
@@ -706,7 +717,11 @@ function pickQuestion(){
   const f=pool[Math.floor(Math.random()*pool.length)]; G.asked.add(f); return {f, again:false};
 }
 const esc = s => s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-const fmt = s => esc(s).replace(/`([^`]+)`/g,(m,c)=>c.includes('\n')?`<pre class="code">${c}</pre>`:`<code>${c}</code>`);
+// Formelsatz (nur außerhalb von Code): $F_G = m · g$ → Buchstaben kursiv, _G bzw. _{12} tiefgestellt; {{a|b}} → Bruch
+const fmtMath = s => s.replace(/\$([^$\n]+)\$/g,(m,f)=>f.replace(/_\{([^}]*)\}|_([A-Za-z0-9])|([A-Za-zΔ])/g,(x,s1,s2,l)=>l?`<i>${l}</i>`:`<sub>${s1||s2}</sub>`))
+  .replace(/\{\{([^{}|]+)\|([^{}]+)\}\}/g,'<span class="frac"><span>$1</span><span>$2</span></span>');
+const fmt = s => esc(s).split(/(`[^`]+`)/).map(p=>p.length>1&&p[0]==='`'&&p.endsWith('`')
+  ? (c=>c.includes('\n')?`<pre class="code">${c}</pre>`:`<code>${c}</code>`)(p.slice(1,-1)) : fmtMath(p)).join('');
 let Q=null;
 function openQuiz(){
   mode='quiz'; joy=null; const {f,again}=pickQuestion();
@@ -895,13 +910,13 @@ function refreshClasses(){
 // Hefter: Merke + Beispiel, Seiten werden mit richtigen Antworten frei
 let heftFrom='ovStart';
 function openHeft(from){ heftFrom=from;
-  $('heftArea').innerHTML=LERNBEREICHE.map(a=>`<option value="${a.id}">${a.icon} ${a.name} – ${pagesOpen(a.id)}/${heftOf(a.id).length} Seiten</option>`).join('');
+  $('heftArea').innerHTML=fachAreas(choice.fach).map(a=>`<option value="${a.id}">${a.icon} ${a.name} – ${pagesOpen(a.id)}/${heftOf(a.id).length} Seiten</option>`).join('');
   $('heftArea').value=choice.area.id; renderHeft(); show('ovHeft'); }
 function renderHeft(){
   const id=$('heftArea').value, A=areaProg(id), H=heftOf(id), n=pagesOpen(id), area=LERNBEREICHE.find(a=>a.id===id);
   $('heftStats').innerHTML=learnHtml(id)+`✔ ${A.ok} richtig · 🔍 ${Object.keys(A.seen).length}/${area.fragen.length} Fragen entdeckt · 📓 ${n}/${H.length} Seiten · 🔁 ${Object.keys(A.box).length} zum Wiederholen`;
   $('heftPages').innerHTML=H.map((pg,i)=> i<n
-    ? `<div class="page"><h3>${i+1}. ${esc(pg.t)}</h3><p>💡 ${fmt(pg.merke).replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>")}</p>${pg.code?`<pre class="code">${esc(pg.bsp)}</pre>`:`<p style="color:var(--mut)">Beispiel: ${fmt(pg.bsp)}</p>`}</div>`
+    ? `<div class="page"><h3>${i+1}. ${esc(pg.t)}</h3><p>💡 ${fmt(pg.merke).replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>")}</p>${pg.code?`<pre class="code">${esc(pg.bsp)}</pre>`:`<p style="color:var(--mut)">Beispiel: ${fmt(pg.bsp).replace(/\n/g,"<br>")}</p>`}</div>`
     : `<div class="page lock"><h3>🔒 ${i+1}. ${esc(pg.t)}</h3><p>noch ${i*3-A.ok} richtige Antwort${i*3-A.ok>1?'en':''} in diesem Bereich</p></div>`).join('') || '<p class="hint">Für diesen Bereich gibt es noch keinen Hefter.</p>';
 }
 $('heftArea').onchange=renderHeft;
@@ -952,11 +967,17 @@ $('nick').addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter
 
 function selList(el, list, key){
   el.innerHTML=list.map((c,i)=>`<button class="card ${c.off?'off':''} ${choice[key]===c?'sel':''}" data-i="${i}"><div class="big">${c.icon}</div><b>${c.name}</b><small>${c.desc||c.stufe||''}</small></button>`).join('');
-  el.onclick=e=>{ const b=e.target.closest('.card'); if(!b) return; const c=list[+b.dataset.i]; if(c.off) return; choice[key]=c; selList(el,list,key); if(key==='area'){ setFocus([]); renderFocus(); renderBoard(); updHeftInfo(); } };
+  el.onclick=e=>{ const b=e.target.closest('.card'); if(!b) return; const c=list[+b.dataset.i]; if(c.off) return; choice[key]=c; selList(el,list,key);
+    if(key==='fach'){ store.set('ls_fach',c.id); choice.area=fachAreas(c).find(a=>a.id===store.get('ls_area_'+c.id,''))||fachAreas(c)[0]; selList($('selArea'),fachAreas(c),'area'); }
+    if(key==='area') store.set('ls_area_'+choice.fach.id,c.id);
+    if(key==='area'||key==='fach'){ setFocus([]); renderFocus(); renderBoard(); updHeftInfo(); } };
 }
 refreshClasses(); selList($('selClass'),CLASSES,'cls'); $('selMap').innerHTML=WORLDS.map((w,i)=>`<div class="card" style="cursor:default"><div class="big">${w.icon}</div><b>${i+1}. ${w.name}</b><small>${w.desc}</small></div>`).join('');
 LERNBEREICHE.forEach(a=>a.desc=a.stufe+' · '+a.fragen.length+' Fragen');
-selList($('selArea'),LERNBEREICHE,'area'); renderBoard(); updHeftInfo();
+FAECHER.forEach(f=>{ const n=fachAreas(f).length; f.desc=f.stufe+' · '+n+' Lernbereich'+(n>1?'e':''); });
+const FAECHER_DA = FAECHER.filter(f=>fachAreas(f).length);
+if(FACH_FIX || FAECHER_DA.length<2) $('fachBox').style.display='none'; else selList($('selFach'),FAECHER_DA,'fach');
+selList($('selArea'),fachAreas(choice.fach),'area'); renderBoard(); updHeftInfo();
 // ---------- Schwerpunkt: Themen (= Kapitel im OPAL-Kurs) eines Lernbereichs auswählen ----------
 function themeKey(t,used){ let k=(t.match(/^(\d+(?:\.\d+)*[a-z]?)\s/)||[])[1] || t.toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24); while(used.has(k)) k+='x'; used.add(k); return k; }
 function themesOf(area){ if(area._th) return area._th; const m=new Map(), used=new Set();
@@ -982,7 +1003,7 @@ $('focusLink').onclick=()=>{ let u=location.origin+location.pathname+'?bereich='
   (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(done).catch(()=>prompt('Link kopieren:',u)); };
 // Link der Lehrkraft: ?bereich=algo&themen=2.2.3,2.2.4&modus=nur|meist
 (function(){ const q=new URLSearchParams(location.search), a=LERNBEREICHE.find(x=>x.id===q.get('bereich')); if(!a) return;
-  choice.area=a; selList($('selArea'),LERNBEREICHE,'area'); const ks=(q.get('themen')||'').split(',').filter(Boolean);
+  choice.area=a; selList($('selArea'),fachAreas(choice.fach),'area'); const ks=(q.get('themen')||'').split(',').filter(Boolean);
   setFocus(themesOf(a).filter(x=>ks.includes(x.key)).map(x=>x.key)); if(q.get('modus')==='meist') choice.fmode='meist';
   if(focusActive()) $('focusBox').open=true; renderBoard(); updHeftInfo(); })();
 renderFocus();

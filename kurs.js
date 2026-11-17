@@ -1,17 +1,25 @@
 'use strict';
-// Lernbereiche = LK Informatik Sachsen (Lehrplan 2022) nach den OPAL-Kursen. Die Fragen stehen in kurs/<id>.js,
+// Fächer und Lernbereiche. Die Fragen stehen in kurs/<id>.js, der Hefter in heft/<id>.js.
 // Format je Frage: d = Stufe 1–3, q = Frage (`code`, mehrzeilig als Block), a = 4 Antworten (die ERSTE ist richtig), e = Erklärung, src = Quelle.
+// Formeln: $F_G = m · g$ (kursiv, _G = Index), Brüche: {{Zähler|Nenner}} – auch in Antworten, Erklärungen und im Hefter.
+// Neues Fach: in FAECHER eintragen, Lernbereiche mit fach: '<id>' anhängen, Dateien in index.html einbinden.
+// Link nur für ein Fach: index.html?fach=physik
+window.FAECHER = [
+  {id: 'informatik', icon: '💻', name: 'Informatik', stufe: 'Leistungskurs Klasse 11/12'},
+  {id: 'physik',     icon: '🧲', name: 'Physik',     stufe: 'Klasse 7'},
+];
 // Reihenfolge wie im Kurs: Grundlagen → Algorithmen → Datenstrukturen → Kl. 11 → Kl. 12
 window.LERNBEREICHE = [
-  {id: 'python',     icon: '🐍', name: 'Python-Grundlagen'},
-  {id: 'algo',       icon: '📊', name: 'Algorithmen & Komplexität'},
-  {id: 'daten',      icon: '🧱', name: 'Datenstrukturen'},
-  {id: 'ki',         icon: '🤖', name: 'Künstliche Intelligenz'},
-  {id: 'technik',    icon: '🔦', name: 'Technische Informatik'},
-  {id: 'oop',        icon: '🔧', name: 'Programmierparadigmen & OOP'},
-  {id: 'netze',      icon: '📡', name: 'Rechnernetze'},
-  {id: 'automaten',  icon: '⚙️', name: 'Sprachen & Automaten'},
-  {id: 'datenbank',  icon: '🗄️', name: 'Datenmanagement'},
-  {id: 'sicherheit', icon: '🔐', name: 'Informationssicherheit'},
+  {id: 'python',     fach: 'informatik', icon: '🐍', name: 'Python-Grundlagen'},
+  {id: 'algo',       fach: 'informatik', icon: '📊', name: 'Algorithmen & Komplexität'},
+  {id: 'daten',      fach: 'informatik', icon: '🧱', name: 'Datenstrukturen'},
+  {id: 'ki',         fach: 'informatik', icon: '🤖', name: 'Künstliche Intelligenz'},
+  {id: 'technik',    fach: 'informatik', icon: '🔦', name: 'Technische Informatik'},
+  {id: 'oop',        fach: 'informatik', icon: '🔧', name: 'Programmierparadigmen & OOP'},
+  {id: 'netze',      fach: 'informatik', icon: '📡', name: 'Rechnernetze'},
+  {id: 'automaten',  fach: 'informatik', icon: '⚙️', name: 'Sprachen & Automaten'},
+  {id: 'datenbank',  fach: 'informatik', icon: '🗄️', name: 'Datenmanagement'},
+  {id: 'sicherheit', fach: 'informatik', icon: '🔐', name: 'Informationssicherheit'},
+  {id: 'kraefte',    fach: 'physik',     icon: '⚖️', name: 'Kräfte'},
 ].filter((b) => window.KURS && window.KURS[b.id])
  .map((b) => Object.assign(b, {stufe: window.KURS[b.id].stufe, fragen: window.KURS[b.id].fragen}));

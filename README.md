@@ -6,6 +6,8 @@ Ein kleines Survivor-Spiel für den Informatikunterricht: Gegnerwellen überlebe
 
 **Spielen:** [lern-survivor.de](https://lern-survivor.de) öffnen – läuft im Browser auf PC, Tablet und Handy, ohne Anmeldung.
 
+**Fächer:** Informatik (LK 11/12) und Physik (Kl. 7, Kräfte). Link nur für Physik: [lern-survivor.de/?fach=physik](https://lern-survivor.de/?fach=physik) – dann gibt es keine Fachauswahl. Neues Fach: in `kurs.js` eintragen, Fragen in `kurs/<id>.js`, Hefter in `heft/<id>.js`. Formeln schreibt man als `$F_G = m · g$`, Brüche als `{{Zähler|Nenner}}`.
+
 ## Lernbereiche
 
 Die zehn Lernbereiche folgen dem **Lehrplan Informatik Sachsen (Gymnasium, Leistungskurs, 2022)** und den OPAL-Kursen des LK (Begriffe, Notation und Beispiele wie dort): Python-Grundlagen, Algorithmen & Komplexität, Datenstrukturen, Künstliche Intelligenz, Technische Informatik, Programmierparadigmen & OOP, Rechnernetze, Sprachen & Automaten, Datenmanagement, Informationssicherheit – je etwa 70 Fragen und ein Hefter mit Merksätzen.
