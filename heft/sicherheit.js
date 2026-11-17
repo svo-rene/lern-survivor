@@ -1,7 +1,7 @@
 'use strict';
 // Hefter Lern-Survivor – Informationssicherheit (LK LB 8). Quellen: OPAL LK_INF_LB8_-_Informationssicherheit_-_GDP
 // (8.1–8.15, 7.11 TLS und VPN, 7.12 Authentifizierung; Merke-Kästen und Beispiele), OPAL LK_INF_Abiturvorbereitung 6.2,
-// Lehrplan Sachsen 2022 LK LB 8 (Datenschutzprinzipien, OSINT). Fragen in kurs/sicherheit.js.
+// Lehrplan Sachsen 2022 LK LB 8 (Datenschutzprinzipien). Fragen in kurs/sicherheit.js.
 (window.HEFT = window.HEFT || {}).sicherheit = [
   {t: 'Die fünf Schutzziele',
     merke: 'Die drei Grundziele (CIA): **Vertraulichkeit** – nur Berechtigte können die Information lesen; **Integrität** – Daten sind vollständig und unverändert, unbefugte Änderungen werden zumindest erkannt; **Verfügbarkeit** – Daten und Systeme sind nutzbar, wenn sie gebraucht werden.\nErgänzt durch **Authentizität** (Echtheit des Partners bzw. der Quelle ist nachgewiesen) und **Verbindlichkeit** (eine Handlung kann einer Person eindeutig zugeordnet werden, sie kann sie gegenüber Dritten nicht abstreiten).',
@@ -25,7 +25,7 @@
     merke: 'Jedes Zeichen wird mit einem Schlüsselzeichen verknüpft: Buchstaben per Addition mod 26, Bits per **XOR**. Der Schlüssel muss **echt zufällig**, **mindestens so lang wie die Nachricht**, **nur einmal verwendet** und **geheim und sicher übergeben** sein – dann ist das Verfahren perfekt sicher (Shannon).\nZweimal benutzt: c₁ XOR c₂ = m₁ XOR m₂, der Schlüssel fällt heraus.',
     bsp: 'INFO + XMCK: I(8) + X(23) = 31 mod 26 = 5 (F) … → FZHY\n01001000 XOR 10100111 = 11101111', code: true},
   {t: 'Kryptoanalyse',
-    merke: 'Angriffsarten: **Ciphertext-only** (nur Geheimtexte), **Known-Plaintext** (zusätzlich Klartext-Geheimtext-Paare), **Chosen-Plaintext** (selbst gewählte Klartexte verschlüsseln lassen).\n**Brute Force:** alle Schlüssel durchprobieren; Schlüsselraum zⁿ. **Häufigkeitsanalyse:** wirkt gegen monoalphabetische Verfahren (im Deutschen E ≈ 17 %, dann N, I, S, R). **Social Engineering:** Manipulation statt Technik, vorbereitet oft per OSINT (öffentliche Quellen).',
+    merke: 'Angriffsarten: **Ciphertext-only** (nur Geheimtexte), **Known-Plaintext** (zusätzlich Klartext-Geheimtext-Paare), **Chosen-Plaintext** (selbst gewählte Klartexte verschlüsseln lassen).\n**Brute Force:** alle Schlüssel durchprobieren; Schlüsselraum zⁿ. **Häufigkeitsanalyse:** wirkt gegen monoalphabetische Verfahren (im Deutschen E ≈ 17 %, dann N, I, S, R). **Social Engineering:** Manipulation statt Technik.',
     bsp: '4-stellige PIN: 10⁴ = 10 000 Möglichkeiten; mit Sperre nach 3 Versuchen 3/10 000 = 0,03 %.', code: false},
   {t: 'AES',
     merke: 'Symmetrische **Blockchiffre** (Nachfolger von DES: 56-Bit-Schlüssel, seit 1998 per Brute Force gebrochen): Blöcke von 128 Bit, Schlüssel 128/192/256 Bit (10/12/14 Runden). Runde: SubBytes (S-Box), ShiftRows, MixColumns, AddRoundKey (XOR); die letzte ohne MixColumns.\n**Konfusion** (SubBytes, AddRoundKey) und **Diffusion** (ShiftRows, MixColumns). **ECB nicht verwenden:** gleiche Blöcke ergeben gleiche Geheimtexte; besser CBC oder GCM mit nie wiederholtem Nonce.',
