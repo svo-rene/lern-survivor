@@ -103,6 +103,56 @@ const R3 = (() => {
     aura.visible = false; scene.add(aura);
     bolts = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color: '#e0f2fe'}));
     bolts.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(600 * 3), 3)); bolts.frustumCulled = false; scene.add(bolts);
+    loadModels();
+  }
+
+  // 3D-Modelle aus modelle/*.glb (von tools/meshy.py). Fehlt eine Datei, bleiben die einfachen Formen.
+  // Kleiner GLB-Leser: erstes Dreiecksnetz, Position/Normale/UV, Farbtextur. Modell wird auf Höhe 1 gebracht, Fuß auf y = 0.
+  const MOD = {};
+  async function loadGlb(url) {
+    const r = await fetch(url); if (!r.ok) return null;
+    const buf = await r.arrayBuffer(), dv = new DataView(buf);
+    if (dv.getUint32(0, true) !== 0x46546C67) return null;
+    const jl = dv.getUint32(12, true), js = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jl)));
+    const bin = 28 + jl, TYPES = {5126: Float32Array, 5125: Uint32Array, 5123: Uint16Array, 5121: Uint8Array}, N = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4};
+    const read = ai => {
+      const a = js.accessors[ai], v = js.bufferViews[a.bufferView], T = TYPES[a.componentType], n = N[a.type];
+      const off = bin + (v.byteOffset || 0) + (a.byteOffset || 0), stride = v.byteStride || 0, out = new T(a.count * n);
+      if (!stride || stride === n * T.BYTES_PER_ELEMENT) out.set(new T(buf.slice(off, off + out.byteLength)));
+      else for (let i = 0; i < a.count; i++) out.set(new T(buf.slice(off + i * stride, off + i * stride + n * T.BYTES_PER_ELEMENT)), i * n);
+      return [out, n];
+    };
+    const prim = js.meshes[0].primitives[0], at = prim.attributes, geo = new THREE.BufferGeometry();
+    for (const [k, name] of [['POSITION', 'position'], ['NORMAL', 'normal'], ['TEXCOORD_0', 'uv']]) if (at[k] != null) { const [a, n] = read(at[k]); geo.setAttribute(name, new THREE.BufferAttribute(a, n)); }
+    if (prim.indices != null) geo.setIndex(new THREE.BufferAttribute(read(prim.indices)[0], 1));
+    if (!at.NORMAL) geo.computeVertexNormals();
+    geo.computeBoundingBox(); const b = geo.boundingBox, h = b.max.y - b.min.y || 1;
+    geo.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); geo.scale(1 / h, 1 / h, 1 / h);
+    geo.computeBoundingBox();
+    const mat = new THREE.MeshLambertMaterial({color: '#fff'});
+    const ti = js.materials?.[prim.material]?.pbrMetallicRoughness?.baseColorTexture?.index;
+    const img = ti != null && js.images[js.textures[ti].source];
+    if (img && img.bufferView != null) {
+      const v = js.bufferViews[img.bufferView], blob = new Blob([new Uint8Array(buf, bin + (v.byteOffset || 0), v.byteLength)], {type: img.mimeType});
+      const tex = new THREE.Texture(await createImageBitmap(blob)); tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true;
+      mat.map = tex; mat.needsUpdate = true;
+    }
+    return {geo, mat};
+  }
+  async function loadModels() {
+    try {
+      const held = await loadGlb('modelle/held.glb');
+      if (held) {
+        for (const c of player.children) c.visible = false;
+        const m = new THREE.Mesh(held.geo, held.mat); m.scale.setScalar(72); player.add(m);
+        MOD.held = held; robeMat = held.mat; robeMat.emissive = new THREE.Color('#000');
+      }
+      const bug = await loadGlb('modelle/bug.glb');
+      if (bug) {   // Breite des Modells → 2 (wie die Kugel mit Radius 1)
+        const bb = bug.geo.boundingBox, w = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) || 1;
+        bug.geo.scale(2 / w, 2 / w, 2 / w); I.bug.geometry.dispose(); I.bug.geometry = bug.geo; I.bug.material = bug.mat; MOD.bug = bug;
+      }
+    } catch (err) { console.warn('3D-Modelle nicht geladen:', err); }
   }
 
   function placeTrees(p) {
@@ -138,7 +188,10 @@ const R3 = (() => {
     for (const e of G.en) {
       const m = I[e.type], i = n[e.type]++, r = e.r, ry = Math.atan2(p.x - e.x, p.y - e.y);
       let y = r, sx = r, sy = r, sz = r;
-      if (e.type === 'bug') { sy = r * .7; sz = r * 1.2; y = r * .7 + Math.abs(Math.sin(t * 14 + e.x)) * 2; }
+      if (e.type === 'bug') {
+        if (MOD.bug) { const k = e.flash > 0 ? 1.9 : 1.6; sx = sy = sz = r * k; y = Math.abs(Math.sin(t * 14 + e.x)) * 2; }
+        else { sy = r * .7; sz = r * 1.2; y = r * .7 + Math.abs(Math.sin(t * 14 + e.x)) * 2; }
+      }
       if (e.type === 'glitch') { y = r * 1.6 + Math.sin(t * 6 + e.y) * 3; }
       if (e.type === 'lock') { sx = sz = r * 1.6; sy = r * 1.6; y = r * .8; }
       if (e.type === 'boss') { y = r * 1.3; }
@@ -149,9 +202,10 @@ const R3 = (() => {
       if (e.type === 'tutor') { y = r * 1.25 + Math.sin(t * 2) * 4; put(I.cap, ncap++, e.x, y + r * 1.05, e.y, r * 1.5, r * 1.5, r * 1.5, t * .7); }
       put(m, i, e.x, y, e.y, sx, sy, sz, e.type === 'glitch' || e.type === 'boss' ? t * 2 + e.x : e.type === 'tutor' ? t * .7 : ry);
       const big = e.type === 'boss' || e.type === 'tutor' || e.type === 'abi';   // Bosse nur leicht aufhellen, sonst blinken sie dauerhaft weiß
-      col(m, i, e.flash > 0 ? (big ? (e.type === 'tutor' ? '#fde68a' : e.type === 'abi' ? '#ddd6fe' : '#f87171') : '#ffffff') : e.slow > 0 && !big ? '#7dd3fc' : e.dash > 0 ? '#fde047' : FOE_COL[e.type]);
+      if (e.type === 'bug' && MOD.bug) col(m, i, e.flash > 0 ? '#ffd4d4' : e.slow > 0 ? '#9ddcff' : '#ffffff');   // Modell: Textur zeigen, nur leicht tönen
+      else col(m, i, e.flash > 0 ? (big ? (e.type === 'tutor' ? '#fde68a' : e.type === 'abi' ? '#ddd6fe' : '#f87171') : '#ffffff') : e.slow > 0 && !big ? '#7dd3fc' : e.dash > 0 ? '#fde047' : FOE_COL[e.type]);
       put(I.shadow, sh++, e.x, .5, e.y, r * 1.1);
-      if (e.type !== 'boss' && e.type !== 'spam') for (const s of [-1, 1]) {   // Augen Richtung Zauberer
+      if (e.type !== 'boss' && e.type !== 'spam' && !(e.type === 'bug' && MOD.bug)) for (const s of [-1, 1]) {   // Augen Richtung Zauberer
         const ex = e.x + Math.sin(ry) * r * .9 + Math.cos(ry) * s * r * .35, ez = e.y + Math.cos(ry) * r * .9 - Math.sin(ry) * s * r * .35;
         put(I.eye, ne++, ex, y + r * .25, ez, Math.max(1.6, r * .16));
       }
@@ -216,7 +270,7 @@ const R3 = (() => {
   }
 
   function toScreen(x, y, h) { P.set(x, h, y).project(cam); return {x: (P.x + 1) / 2 * lastW, y: (1 - P.y) / 2 * lastH, vis: P.z < 1}; }
-  function setLook(robe, hat) { robeMat.color.set(robe); hatMat.color.set(hat); }
+  function setLook(robe, hat) { if (MOD.held) return; robeMat.color.set(robe); hatMat.color.set(hat); }
   function setWorld(i) {
     if (!scene) return; const T = THEMES[i] || THEMES[0];
     if (i !== worldNow) { const tex = grassTexture(T); tex.repeat.set(4096 / 256, 4096 / 256); ground.material.map.dispose(); ground.material.map = tex; ground.material.needsUpdate = true; worldNow = i; }
