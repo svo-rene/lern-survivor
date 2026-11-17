@@ -131,7 +131,7 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
   <header class="hero">
     <div class="logo"><span class="l1">LERN</span><span class="l2">SURVIVOR</span></div>
     <p class="tag">Überlebe die Wellen – <b>mit deinem Wissen</b>.</p>
-    <div class="pills"><span>⬆️ Level-up = Frage</span><span>⚡ schnell + richtig = 🍀 Glück</span><span>🔥 Streaks</span><span>📦 Kisten</span><span>🗺️ 3 Welten, je ein Endboss</span><span>🎓 zum Schluss: das Abitur</span></div>
+    <div class="pills"><span>⬆️ Level-up = Frage</span><span>⚡ schnell + richtig = 🍀 Glück</span><span>🔥 Streaks</span><span>📦 Kisten</span><span>🗺️ 3 Welten, je ein Endboss</span><span id="pillEnd">🎓 zum Schluss: das Abitur</span></div>
   </header>
   <div class="box sbox">
     <h2>Dein Spitzname</h2><input id="nick" maxlength="16" placeholder="z. B. Bitzauberer" autocomplete="off" spellcheck="false">
@@ -154,7 +154,7 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
   </div>
   <div class="box sbox">
     <h2 style="margin-top:0">🏆 Bestenliste (dieses Gerät)</h2><div id="board"></div>
-    <p class="hint">Punkte: 100 je richtige Antwort + 1 je Sekunde + 20 je Stufe des besten Streaks + 300 je geschaffte Welt + 1000 für das bestandene Abitur (🎓). Zusatzfragen beim Neu-Würfeln zählen nicht.</p>
+    <p class="hint">Punkte: 100 je richtige Antwort + 1 je Sekunde + 20 je Stufe des besten Streaks + 300 je geschaffte Welt + 1000 für den Sieg über den letzten Endboss (<span id="hintEnd">🎓</span>). Zusatzfragen beim Neu-Würfeln zählen nicht.</p>
   </div>
 </div></div>
 
@@ -242,6 +242,11 @@ const WORLDS = [
   {id:'wueste', icon:'🏜️', name:'Die Wüste', boss:'tutor', desc:'Neu: Spam schießt, Forks teilen sich. Endboss: 🧑‍🏫 Der Tutor'},
   {id:'eis', icon:'❄️', name:'Das Eisland', boss:'abi', desc:'Neu: Overflows stürmen los. Endboss: 🎓 Das Abitur'},
 ];
+WORLDS.forEach(w=>w.base=w.desc.replace(/ Endboss:.*$/,''));
+// Endbosse je Fach (FAECHER[x].bosse in kurs.js): Namen, Symbole und Texte werden beim Fachwechsel gesetzt
+const BOSS_IDS = ['boss','tutor','abi'], BI = {boss:'📝', tutor:'🧑‍🏫', abi:'🎓'};
+let BT = {sieg:'Abitur bestanden', aufgaben:'verteilt Hausaufgaben'};
+const lc1 = s => s[0].toLowerCase()+s.slice(1);
 const WORLD_T = 80;   // Spielzeit ohne Fragen; mit Fragepausen etwa 3 Minuten je Welt
 const RAR = [
   // m = Faktor für Buch-Werte, step = Stufen für Waffen/Gegenstände
@@ -485,15 +490,15 @@ function foeAI(e, dt, dx, dy, d){
       if(pat==='dash'){ e.tele=.9; e.tx=p.x; e.ty=p.y; }
       if(pat==='ring'){ const big=e.type!=='boss', n=(big?18:12)+(ph2?6:0), off=Math.random(); for(let i=0;i<n;i++) eShoot(e.x,e.y,(i+off)/n*Math.PI*2,big?190:160,e.dmg*.45,f.col); }
       if(pat==='spiral') e.spiral=ph2?2.2:1.6;
-      if(pat==='split'){ for(let i=0;i<4+(ph2?3:0);i++){ const m=spawn('fork'), a=i/4*Math.PI*2; m.x=e.x+Math.cos(a)*80; m.y=e.y+Math.sin(a)*80; } toast('🎓 Das Abitur stellt Zusatzaufgaben – Forks!'); }
-      if(pat==='summon'){ for(let i=0;i<6+(ph2?4:0);i++){ const m=spawn('glitch'); const a=i/6*Math.PI*2; m.x=e.x+Math.cos(a)*90; m.y=e.y+Math.sin(a)*90; } toast(e.type==='abi'?'📚 Das Abitur prüft alles – Glitches!':'📚 Der Tutor verteilt Hausaufgaben!'); }
+      if(pat==='split'){ for(let i=0;i<4+(ph2?3:0);i++){ const m=spawn('fork'), a=i/4*Math.PI*2; m.x=e.x+Math.cos(a)*80; m.y=e.y+Math.sin(a)*80; } toast(`${BI.abi} ${FOES.abi.name} stellt Zusatzaufgaben – Forks!`); }
+      if(pat==='summon'){ for(let i=0;i<6+(ph2?4:0);i++){ const m=spawn('glitch'); const a=i/6*Math.PI*2; m.x=e.x+Math.cos(a)*90; m.y=e.y+Math.sin(a)*90; } toast(e.type==='abi'?`📚 ${FOES.abi.name} prüft alles – Glitches!`:`📚 ${FOES.tutor.name} ${BT.aufgaben}!`); }
       e.cd=(e.type==='abi'?3.1:e.type==='tutor'?3.4:4.2)*k; return pat==='dash'||pat==='spiral'; }
   }
   return false;
 }
 // Boss besiegt: Gratis-Kiste und nächste Welt; das Abitur beendet die Runde mit einem Sieg
 function bossDown(e){
-  if(e.type==='abi'){ G.won=true; G.winT=1.5; toast('🎓 Abitur bestanden!'); return; }
+  if(e.type==='abi'){ G.won=true; G.winT=1.5; toast(`${BI.abi} ${BT.sieg}!`); return; }
   G.chests.push({x:e.x, y:e.y, free:true}); G.nextWorldT=3; toast(`🏁 ${WORLDS[G.world].name} geschafft! Gratis-Kiste – gleich geht es weiter.`);
 }
 // Weltwechsel: Gegner verschwinden, Kristalle fliegen zu dir, halbes Leben zurück
@@ -541,7 +546,7 @@ function update(dt){
   if(G.spawnAcc>1) G.spawnAcc=1;
   if(G.nextWorldT>0){ G.nextWorldT-=dt; if(G.nextWorldT<=0) nextWorld(); }
   else { G.wt+=dt; const bt=WORLDS[G.world].boss;
-    if(!G.warned && G.wt>=WORLD_T-10){ G.warned=true; toast(bt==='abi'?'🎓 Gleich kommt das Abitur – die Abschlussprüfung!':`⚠️ Gleich kommt der Endboss: ${FOES[bt].name}!`); }
+    if(!G.warned && G.wt>=WORLD_T-10){ G.warned=true; toast(bt==='abi'?`${BI.abi} Gleich kommt ${lc1(FOES.abi.name)} – der letzte Endboss!`:`⚠️ Gleich kommt der Endboss: ${FOES[bt].name}!`); }
     if(!G.bossOn && G.wt>=WORLD_T){ G.bossOn=true; spawn(bt); tip(bt==='abi'?'abi':'boss'); } }
   if(G.level>=6 && Object.keys(p.w).length<2) tip('more');
 
@@ -649,7 +654,7 @@ function draw(){
   const bosses=G.en.filter(e=>FOES[e.type].boss);
   bosses.forEach((e,i)=>{ const mob=W<700, bw=mob?W-120:Math.min(420,W-420), x=mob?16:Math.max(250,(W-bw)/2), y=mob?H-46-i*24:(document.querySelector('#hud .row')?.getBoundingClientRect().bottom||50)+10+i*24;
     cx.fillStyle='#000b'; cx.fillRect(x-2,y-2,bw+4,18); cx.fillStyle=FOES[e.type].col; cx.fillRect(x,y,bw*Math.max(0,e.hp/e.max),14);
-    cx.fillStyle='#fff'; cx.font='800 12px system-ui'; cx.textAlign='center'; cx.fillText(`${{boss:'📝',tutor:'🧑‍🏫',abi:'🎓'}[e.type]||'⚠️'} ${FOES[e.type].name}${e.hp<e.max*.5?' – wütend!':''}`,W/2,y+11); });
+    cx.fillStyle='#fff'; cx.font='800 12px system-ui'; cx.textAlign='center'; cx.fillText(`${BI[e.type]||'⚠️'} ${FOES[e.type].name}${e.hp<e.max*.5?' – wütend!':''}`,W/2,y+11); });
   drawNums(); drawGlow(); miniMap(cost);
   if(joy){ cx.strokeStyle='#fff5'; cx.lineWidth=2; cx.beginPath(); cx.arc(joy.ox,joy.oy,45,0,7); cx.stroke(); cx.fillStyle='#fff5'; cx.beginPath();
     const dx=joy.x-joy.ox, dy=joy.y-joy.oy, l=Math.min(45,Math.hypot(dx,dy)), a=Math.atan2(dy,dx); cx.arc(joy.ox+Math.cos(a)*l,joy.oy+Math.sin(a)*l,18,0,7); cx.fill(); }
@@ -836,9 +841,9 @@ function gameOver(win){
   const entry={id:Date.now(), name:G.name, cls:G.cls.icon, area:choice.area.id, pts:a*100+s+G.best*20+bonus, ok, q:G.hist.length, t:s, lvl:G.level, win:!!win};
   const all=store.get('ls_scores',[]); all.push(entry); all.sort((x,y)=>y.pts-x.pts); store.set('ls_scores', all.slice(0,300));
   const rank=all.filter(x=>x.area===entry.area).indexOf(entry)+1;
-  $('overTitle').textContent = win ? '🎓 Bestanden!' : 'Vorbei';
+  $('overTitle').textContent = win ? BI.abi+' Geschafft!' : 'Vorbei';
   $('overPts').innerHTML=`${esc(G.name)}: ${entry.pts} Punkte`+(rank===1?' – 🥇 neuer Rekord!':rank<=10?` – Platz ${rank}`:'');
-  $('overBreak').innerHTML=`${a} richtig × 100 = ${a*100} · ${s} s = ${s} · bester Streak ${G.best} × 20 = ${G.best*20}`+(wd?` · 🏁 ${wd} Welt${wd>1?'en':''} × 300 = ${wd*300}`:'')+(win?' · 🎓 Abitur bestanden +1000':'')+
+  $('overBreak').innerHTML=`${a} richtig × 100 = ${a*100} · ${s} s = ${s} · bester Streak ${G.best} × 20 = ${G.best*20}`+(wd?` · 🏁 ${wd} Welt${wd>1?'en':''} × 300 = ${wd*300}`:'')+(win?` · ${BI.abi} ${BT.sieg} +1000`:'')+
     (G.rrOk?` · (${G.rrOk} Zusatzfrage${G.rrOk>1?'n':''} beim Neu-Würfeln zählt nicht)`:'')+
     (win?'':`<br>Erwischt von ${FOE_NAME(G.lastHit)} bei ${fmtT(s)}.`+` Erreicht: ${WORLDS[G.world].icon} Welt ${G.world+1} von 3.`)+
     (G.newPages?`<br>📓 ${G.newPages} neue Hefterseite${G.newPages>1?'n':''} freigeschaltet!`:'');
@@ -936,7 +941,7 @@ const fmtT = t => { const s=Math.max(0,Math.ceil(t)); return Math.floor(s/60)+':
 function boardHtml(area, mark){
   const L=store.get('ls_scores',[]).filter(s=>s.area===area).sort((a,b)=>b.pts-a.pts).slice(0,10);
   if(!L.length) return '<p class="hint">Noch keine Einträge – sei die oder der Erste!</p>';
-  return '<table class="board">'+L.map((s,i)=>`<tr class="${s.id===mark?'me':''}"><td>${['🥇','🥈','🥉'][i]||(i+1)+'.'}</td><td>${s.cls||''} ${esc(s.name)}${s.win?' 🎓':''}</td><td>${s.pts}</td><td>${s.ok}/${s.q} ✔ · ${fmtT(s.t)}</td></tr>`).join('')+'</table>';
+  return '<table class="board">'+L.map((s,i)=>`<tr class="${s.id===mark?'me':''}"><td>${['🥇','🥈','🥉'][i]||(i+1)+'.'}</td><td>${s.cls||''} ${esc(s.name)}${s.win?' '+BI.abi:''}</td><td>${s.pts}</td><td>${s.ok}/${s.q} ✔ · ${fmtT(s.t)}</td></tr>`).join('')+'</table>';
 }
 function renderBoard(){ $('board').innerHTML=boardHtml(choice.area.id); }
 
@@ -947,7 +952,7 @@ const TIPS = {
   hurt:  '❤️ Gegner verletzen dich bei <b>Berührung</b> – weich ihnen aus! Dein Leben siehst du oben am roten Balken.',
   streak:'🔥 <b>Streak!</b> Mehrere richtige Antworten hintereinander geben immer mehr 🍀 Glück auf seltene Karten.',
   boss:  '⚠️ Ein <b>Boss</b> kommt! Achte auf die <b>rote Linie</b> – dort stürmt er gleich hin – und weiche den Kugelringen aus. Besiegst du ihn, kommst du in die <b>nächste Welt</b> – dazu gibt es eine <b>Gratis-Kiste</b> und einen Heilkristall.',
-  abi:   '🎓 <b>Das Abitur</b> ist die Abschlussprüfung. Besiegst du es, hast du die Runde <b>bestanden</b>!',
+  abi:   '',   // setzt applyBosses()
   chest: '📦 Du hast genug 🪙 Gold für eine <b>Kiste</b>! Lauf zu einer braunen Kiste: Erst kommt eine Frage, dann wählst du einen <b>Gegenstand</b> (4 Plätze, je bis Stufe 3).',
   more:  '⚔️ Tipp: Bis zu <b>4 Waffen</b> gleichzeitig. Eine neue Waffe bringt meist mehr als ein kleines Buch.',
 };
@@ -968,11 +973,18 @@ $('nick').addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter
 function selList(el, list, key){
   el.innerHTML=list.map((c,i)=>`<button class="card ${c.off?'off':''} ${choice[key]===c?'sel':''}" data-i="${i}"><div class="big">${c.icon}</div><b>${c.name}</b><small>${c.desc||c.stufe||''}</small></button>`).join('');
   el.onclick=e=>{ const b=e.target.closest('.card'); if(!b) return; const c=list[+b.dataset.i]; if(c.off) return; choice[key]=c; selList(el,list,key);
-    if(key==='fach'){ store.set('ls_fach',c.id); choice.area=fachAreas(c).find(a=>a.id===store.get('ls_area_'+c.id,''))||fachAreas(c)[0]; selList($('selArea'),fachAreas(c),'area'); }
+    if(key==='fach'){ store.set('ls_fach',c.id); choice.area=fachAreas(c).find(a=>a.id===store.get('ls_area_'+c.id,''))||fachAreas(c)[0]; selList($('selArea'),fachAreas(c),'area'); applyBosses(); }
     if(key==='area') store.set('ls_area_'+choice.fach.id,c.id);
     if(key==='area'||key==='fach'){ setFocus([]); renderFocus(); renderBoard(); updHeftInfo(); } };
 }
-refreshClasses(); selList($('selClass'),CLASSES,'cls'); $('selMap').innerHTML=WORLDS.map((w,i)=>`<div class="card" style="cursor:default"><div class="big">${w.icon}</div><b>${i+1}. ${w.name}</b><small>${w.desc}</small></div>`).join('');
+function applyBosses(){ const f=choice.fach.bosse?choice.fach:FAECHER[0];
+  BOSS_IDS.forEach((id,i)=>{ BI[id]=f.bosse[i][0]; FOES[id].name=f.bosse[i][1]; });
+  BT={sieg:f.sieg, aufgaben:f.aufgaben};
+  WORLDS.forEach((w,i)=>w.desc=`${w.base} Endboss: ${f.bosse[i][0]} ${f.bosse[i][1]}`);
+  TIPS.abi=`${BI.abi} <b>${FOES.abi.name}</b> ist der letzte Endboss. Schaffst du diesen Kampf, hast du die Runde <b>geschafft</b>!`;
+  $('pillEnd').textContent=`${BI.abi} zum Schluss: ${lc1(FOES.abi.name)}`; $('hintEnd').textContent=BI.abi;
+  $('selMap').innerHTML=WORLDS.map((w,i)=>`<div class="card" style="cursor:default"><div class="big">${w.icon}</div><b>${i+1}. ${w.name}</b><small>${w.desc}</small></div>`).join(''); }
+refreshClasses(); selList($('selClass'),CLASSES,'cls'); applyBosses();
 LERNBEREICHE.forEach(a=>a.desc=a.stufe+' · '+a.fragen.length+' Fragen');
 FAECHER.forEach(f=>{ const n=fachAreas(f).length; f.desc=f.stufe+' · '+n+' Lernbereich'+(n>1?'e':''); });
 const FAECHER_DA = FAECHER.filter(f=>fachAreas(f).length);
