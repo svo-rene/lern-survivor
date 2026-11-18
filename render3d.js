@@ -122,9 +122,9 @@ const R3 = (() => {
     inst('frost', new THREE.OctahedronGeometry(1, 0), basic('#bae6fd'), 40);
     inst('gem', new THREE.LatheGeometry([[0, -6.5], [4.6, -.6], [3.4, 1.6], [0, 2.2]].map(([x, y]) => new THREE.Vector2(x, y)), 8), lam('#fff', {emissive: '#1e293b'}), 450);   // geschliffener Stein
     inst('coin', new THREE.LatheGeometry([[0, -.8], [4.4, -.8], [4.8, -1.3], [6.2, -1.2], [6.5, 0], [6.2, 1.2], [4.8, 1.3], [4.4, .8], [0, .8]].map(([x, y]) => new THREE.Vector2(x, y)), 22).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({color: '#fbbf24', emissive: '#7c3a07'}), 200);   // Münze mit Rand
-    inst('chest', new THREE.BoxGeometry(34, 22, 24).translate(0, 11, 0), lam('#92400e'), 16);   // je Welt 10 Kisten + Gratis-Kiste
-    inst('lid', new THREE.CylinderGeometry(12, 12, 34, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).translate(0, 22, 0), lam('#b45309'), 16);   // je Welt 10 Kisten + Gratis-Kiste
-    inst('band', new THREE.BoxGeometry(36, 4, 26).translate(0, 17, 0), lam('#fbbf24', {emissive: '#713f12'}), 16);   // je Welt 10 Kisten + Gratis-Kiste
+    inst('chest', new THREE.BoxGeometry(34, 22, 24).translate(0, 11, 0), lam('#92400e'), 28);   // bis 18 Kisten je Welt + Gratis-Kisten
+    inst('lid', new THREE.CylinderGeometry(12, 12, 34, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).translate(0, 22, 0), lam('#b45309'), 28);   // bis 18 Kisten je Welt + Gratis-Kisten
+    inst('band', new THREE.BoxGeometry(36, 4, 26).translate(0, 17, 0), lam('#fbbf24', {emissive: '#713f12'}), 28);   // bis 18 Kisten je Welt + Gratis-Kisten
     inst('l_magnet', new THREE.TorusGeometry(9, 3.5, 6, 12, Math.PI).rotateZ(Math.PI).translate(0, 16, 0), lam('#ef4444'), 20);
     inst('l_bombe', new THREE.SphereGeometry(10, 12, 8).translate(0, 11, 0), lam('#334155'), 20);
     inst('l_trank', new THREE.CylinderGeometry(5, 8, 18, 10).translate(0, 9, 0), lam('#f472b6', {emissive: '#831843'}), 20);
