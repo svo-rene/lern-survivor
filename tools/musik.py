@@ -5,7 +5,7 @@ Aufruf:  py -I tools\\musik.py            (alle Stücke, die noch fehlen)
 Braucht die Umgebungsvariable OPENROUTER_API_KEY. Der Schlüssel landet nie im Repo.
 Die Stile sind mit eigenen Worten beschrieben – keine Vorlage eines bestimmten Spiels.
 """
-import base64, json, os, sys, urllib.request
+import base64, json, os, sys, urllib.request, urllib.error
 
 MODEL = 'google/lyria-3-pro-preview'
 ZIEL = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'musik')
@@ -40,17 +40,33 @@ def finde_audio(o):
 def erzeuge(name, prompt):
     key = os.environ.get('OPENROUTER_API_KEY')
     if not key: sys.exit('OPENROUTER_API_KEY fehlt. In PowerShell:  $env:OPENROUTER_API_KEY = "sk-or-..."')
-    body = {'model': MODEL, 'modalities': ['text', 'audio'], 'messages': [{'role': 'user', 'content': prompt}]}
+    body = {'model': MODEL, 'modalities': ['text', 'audio'], 'stream': True, 'messages': [{'role': 'user', 'content': prompt}]}
     req = urllib.request.Request('https://openrouter.ai/api/v1/chat/completions', data=json.dumps(body).encode(),
                                  headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'X-Title': 'Lern-Survivor'})
     print(f'{name}: erzeuge …', flush=True)
-    with urllib.request.urlopen(req, timeout=600) as r: ant = json.loads(r.read())
-    gef = finde_audio(ant)
-    if not gef:
-        open(os.path.join(ZIEL, name + '_antwort.json'), 'w', encoding='utf-8').write(json.dumps(ant, indent=1)[:20000])
-        sys.exit(f'{name}: keine Audiodaten gefunden, Antwort in musik/{name}_antwort.json')
-    daten, fmt = gef; endung = 'wav' if fmt and 'wav' in fmt else 'mp3'
-    pfad = os.path.join(ZIEL, f'{name}.{endung}'); open(pfad, 'wb').write(base64.b64decode(daten))
+    teile, fmt, roh = [], None, []
+    try:
+        with urllib.request.urlopen(req, timeout=900) as r:   # Datenstrom (SSE): Audio kommt in Stücken als Base64
+            for zeile in r:
+                zeile = zeile.decode('utf-8', 'replace').strip()
+                if not zeile.startswith('data:'): continue
+                d = zeile[5:].strip()
+                if d == '[DONE]': break
+                try: o = json.loads(d)
+                except ValueError: continue
+                if len(roh) < 5: roh.append(o)
+                for ch in o.get('choices', []):
+                    au = (ch.get('delta') or {}).get('audio') or {}
+                    if au.get('data'): teile.append(base64.b64decode(au['data']))
+                    fmt = au.get('format') or fmt
+    except urllib.error.HTTPError as e:
+        sys.exit(f'{name}: Fehler {e.code}: {e.read().decode(errors="replace")[:800]}')
+    if not teile:
+        open(os.path.join(ZIEL, name + '_antwort.json'), 'w', encoding='utf-8').write(json.dumps(roh, indent=1)[:20000])
+        sys.exit(f'{name}: keine Audiodaten gefunden, Anfang der Antwort in musik/{name}_antwort.json')
+    daten = b''.join(teile)
+    endung = 'wav' if daten[:4] == b'RIFF' else 'mp3' if daten[:3] == b'ID3' or (daten[0] == 0xFF and daten[1] & 0xE0 == 0xE0) else (fmt or 'bin')
+    pfad = os.path.join(ZIEL, f'{name}.{endung}'); open(pfad, 'wb').write(daten)
     print(f'{name}: fertig, {os.path.getsize(pfad) // 1024} KB ({endung})', flush=True)
 
 
