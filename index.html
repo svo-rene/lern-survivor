@@ -44,6 +44,7 @@ p{margin:6px 0;line-height:1.4}
 #focusList{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border:2px solid var(--line);border-radius:999px;cursor:pointer;font-size:14px;min-height:40px;user-select:none} .chip.on{border-color:var(--acc);background:#2a2410} .chip input{accent-color:#fde047} .chip small{color:var(--mut)}
 #focusMode label{margin-right:14px;font-size:14px;cursor:pointer}
+.help h3{margin:14px 0 4px;font-size:16px} .help p,.help li{font-size:14px;line-height:1.45;color:var(--ink)} .help ul{margin:4px 0;padding-left:20px} .help .tbl{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:14px}
 .mini{background:#334155;color:var(--ink);border:0;border-radius:8px;padding:8px 12px;font:inherit;font-size:13px;cursor:pointer;margin:2px 4px 2px 0}
 .llg{font-size:13px;color:var(--mut)} .llg b{color:var(--ink)}
 .card.sel{border-color:var(--acc)} .card.off{opacity:.4;cursor:default}
@@ -154,6 +155,7 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
     <h2>Welten – nacheinander, je ca. 3 Min. + Endboss</h2><div class="cards" id="selMap"></div>
     <label class="chk"><input type="checkbox" id="tipsChk"> 💡 Tipps beim Spielen zeigen (kommen beim ersten Spiel automatisch)</label>
     <button class="btn go" id="startBtn">▶ Los geht's</button>
+    <button class="btn" id="helpBtn" style="background:#334155;color:var(--ink);font-size:16px">📖 So geht's</button>
     <button class="btn" id="heftBtn" style="background:#334155;color:var(--ink);font-size:16px">📓 Mein Hefter <span id="heftInfo" style="font-weight:600;color:var(--mut)"></span></button>
     <p class="hint" style="text-align:center">WASD / Pfeiltasten oder auf dem Bildschirm ziehen · Leertaste oder 💨 = ausweichen · Angriffe gehen automatisch</p>
   </div>
@@ -189,6 +191,7 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
 <div class="ov" id="ovPause"><div class="box">
   <h1>⏸ Pause</h1><div id="pauseInfo"></div>
   <button class="btn" id="resumeBtn">▶ Weiter</button>
+  <button class="btn" id="pauseHelp" style="background:#334155;color:var(--ink);font-size:15px">📖 So geht's</button>
   <button class="btn" id="pauseHeft" style="background:#334155;color:var(--ink);font-size:15px">📓 Hefter ansehen</button>
   <div style="display:flex;gap:8px"><button class="btn" id="sndSfx" style="background:#334155;color:var(--ink);font-size:15px"></button><button class="btn" id="sndMus" style="background:#334155;color:var(--ink);font-size:15px"></button></div>
   <button class="btn" id="quitBtn" style="background:#3a1414;color:var(--ink);font-size:15px">⏹ Runde beenden</button>
@@ -206,6 +209,13 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
   <h2>Das solltest du wiederholen</h2><div id="overRetry"></div><div id="overWrong"></div>
   <button class="btn" id="againBtn">↻ Nochmal</button>
   <button class="btn" id="menuBtn" style="background:#334155;color:var(--ink);font-size:15px">🏠 Zum Menü</button>
+</div></div>
+
+<!-- So geht's -->
+<div class="ov" id="ovHelp"><div class="box" style="text-align:left">
+  <h1 style="font-size:22px;text-align:center">📖 So geht's</h1>
+  <div id="helpBody" class="help"></div>
+  <button class="btn" id="helpClose">Schließen</button>
 </div></div>
 
 <!-- Hefter -->
@@ -516,7 +526,7 @@ const LOOT = {magnet:{icon:'🧲', txt:'Magnet – alle Kristalle fliegen zu dir
 function dropLoot(x, y, kind){ kind=kind||['magnet','bombe','trank'][Math.floor(Math.random()*3)]; G.loot.push({x, y, kind, t:40}); }
 function updLoot(dt){
   const p=G.p;
-  for(const l of G.loot){ l.t-=dt; if((l.x-p.x)**2+(l.y-p.y)**2 > 30*30) continue; l.t=0; toast(`${LOOT[l.kind].icon} ${LOOT[l.kind].txt}`);
+  for(const l of G.loot){ l.t-=dt; const d2=(l.x-p.x)**2+(l.y-p.y)**2; if(d2<450*450) tip('loot'); if(d2 > 30*30) continue; l.t=0; toast(`${LOOT[l.kind].icon} ${LOOT[l.kind].txt}`);
     if(l.kind==='magnet'){ G.gems.forEach(g=>g.pull=true); SND.play('magnet'); }
     if(l.kind==='trank'){ p.hp=Math.min(p.maxHp, p.hp+p.maxHp*.5); SND.play('heal'); }
     if(l.kind==='bombe'){ curSrc='bombe'; for(const e of G.en) if((e.x-p.x)**2+(e.y-p.y)**2 < 650*650) hurt(e, FOES[e.type].boss||e.elite ? e.max*.1 : 99999); curSrc='';
@@ -638,6 +648,7 @@ function update(dt){
     if(!G.warned && G.wt>=WORLD_T-10){ G.warned=true; toast(bt==='abi'?`${BI.abi} Gleich kommt ${lc1(FOES.abi.name)} – der letzte Endboss!`:`⚠️ Gleich kommt der Endboss: ${FOES[bt].name}!`); }
     if(!G.bossOn && G.wt>=WORLD_T){ G.bossOn=true; spawn(bt); SND.play('boss'); tip(bt==='abi'?'abi':'boss'); } }
   if(G.level>=6 && Object.keys(p.w).length<2) tip('more');
+  if(G.t>25 && G.p.hurtT>0) tip('dash');
   if(!G.bossOn && G.nextWorldT<=0){ G.eliteT-=dt; if(G.eliteT<=0){ G.eliteT=50+Math.random()*25; spawnElite(); } }
   updLoot(dt);
 
@@ -944,7 +955,7 @@ function openPick(){
   if(evoId && G.streak>=EVO_STREAK) opts[0]={kind:'evo', id:evoId, r:3};   // Superwaffe als goldene Karte
   else if(evoId && !G.evoHint){ G.evoHint=true; toast(`⭐ ${EVO[evoId].icon} ${EVO[evoId].name} ist bereit – mit Streak ${EVO_STREAK} kommt sie als Karte!`); }
   $('pkSlots').innerHTML=slotsHtml();
-  modalHint('pkHint','pick','🃏 <b>Wähle eine Karte.</b> Waffen (🔥🌩️❄️…) greifen selbst an – bis zu 4 gleichzeitig. Bücher (📕📗…) verbessern deine Werte. Die <b>Farbe</b> zeigt die Seltenheit: grau, <span style="color:var(--r1)">blau</span>, <span style="color:var(--r2)">lila</span>, <span style="color:var(--r3)">gold</span> = immer stärker. Passt nichts? 🔄 unten gibt neue Karten gegen eine weitere Frage. Mit 🚫 verbannst du eine Karte für den Rest der Runde.');
+  modalHint('pkHint','pick','🃏 <b>Wähle eine Karte.</b> Du hast je <b>4 Plätze</b>: ⚔️ Waffen greifen selbst an – deine Startwaffe belegt schon einen, <b>wähle die anderen 3 weise</b>. 📚 Bücher verbessern deine Werte. 🎒 Gegenstände gibt es aus Kisten. Ist ein Bereich voll, kannst du dort nur noch verbessern. Die <b>Farbe</b> zeigt die Seltenheit: grau, <span style="color:var(--r1)">blau</span>, <span style="color:var(--r2)">lila</span>, <span style="color:var(--r3)">gold</span> = immer stärker. Passt nichts? 🔄 unten gibt neue Karten gegen eine weitere Frage. Mit 🚫 verbannst du eine Karte für den Rest der Runde.');
   const luckTxt=L<0?'✘ Falsch beantwortet: fast nur gewöhnliche Karten. Richtige Antworten bringen 🍀 Glück.':`🍀 Glück ${L} – je mehr Glück, desto öfter selten, episch, legendär.`;
   const draw=()=>{ $('pkLuck').textContent=luckTxt+(G.banish>0?` · 🚫 noch ${G.banish} Marke${G.banish>1?'n':''} zum Verbannen`:'');
   $('pkCards').innerHTML=opts.map((o,i)=>{ const R=RAR[o.r]; let ic,nm,tx;
@@ -967,6 +978,7 @@ function openPick(){
     else if(o.kind==='item'){ const l=p.items[o.it.id]||0, to=Math.min(MAX_ITEM_LVL,l+RAR[o.r].istep); for(let k=l;k<to;k++) o.it.ap(p,k+1); p.items[o.it.id]=to; }
     else if(o.kind==='up'){ o.u.ap(p, o.u.v*R.m); p.books[o.u.id]=(p.books[o.u.id]||0)+1; }
     else if(p.w[o.id]) p.w[o.id].lvl=Math.min(MAX_WEP_LVL, p.w[o.id].lvl+RAR[o.r].step); else { addWeapon(o.id); p.w[o.id].lvl=RAR[o.r].step; }
+    if(o.kind==='w' && p.w[o.id].lvl>=MAX_WEP_LVL && EVO[o.id]) tip('evo');
     if(G.stationMode) G.stationMode=false; else if(G.chestMode) G.chestMode=false; else G.pending--;
     G.quizCD=luGap(); resume(); };   // weitere Level-ups kommen erst nach einer Pause (Hauptschleife)
   $('pkReroll').style.display = (G.lastOk && !G.lastReroll && !station) ? 'block' : 'none';
@@ -1087,6 +1099,29 @@ function renderHeft(){
 $('heftArea').onchange=renderHeft;
 $('heftClose').onclick=()=>{ show(heftFrom); if(heftFrom==='ovStart') updHeftInfo(); };
 $('heftBtn').onclick=()=>openHeft('ovStart');
+// „So geht's“: alles auf einer Seite, aus den Spieldaten erzeugt (bleibt so automatisch aktuell)
+let helpFrom='ovStart';
+function helpHtml(){
+  const W_=Object.entries(WEAPONS).map(([id,w])=>`<span>${w.icon} <b>${w.name}</b></span><span>${w.desc}${WUNLOCK[id]&&!wOpen(id)?` <i>(🔒 frei ${WUNLOCK[id].txt})</i>`:''}</span>`).join('');
+  const B=UPS.map(u=>`<span>${u.icon} <b>${u.name}</b></span><span>${u.txt(u.v)} je Stufe (bis Stufe ${MAX_BOOK_LVL})</span>`).join('');
+  const I=ITEMS.map(it=>`<span>${it.icon} <b>${it.name}</b></span><span>${it.txt} je Stufe (bis Stufe ${MAX_ITEM_LVL})</span>`).join('');
+  const E=Object.entries(EVO).map(([id,e])=>{ const u=UPS.find(x=>x.id===e.book); return `<span>${e.icon} <b>${e.name}</b></span><span>${WEAPONS[id].icon} ${WEAPONS[id].name} Stufe ${MAX_WEP_LVL} + ${u.icon} ${u.name} Stufe ${MAX_BOOK_LVL}</span>`; }).join('');
+  const U=[...CLASSES.filter(c=>UNLOCK[c.id]).map(c=>`<li>${c.icon} <b>${c.name}</b> – frei ${UNLOCK[c.id].txt} (${clsOpen(c)?'✅ frei':UNLOCK[c.id].st()})</li>`),
+           ...Object.entries(WUNLOCK).filter(([id])=>!CLASSES.some(c=>c.weapon===id&&UNLOCK[c.id])).map(([id,u])=>`<li>${WEAPONS[id].icon} <b>${WEAPONS[id].name}</b> – frei ${u.txt} (${wOpen(id)?'✅ frei':u.st?u.st():'gesperrt'})</li>`)].join('');
+  return `<h3>🎯 Ziel</h3><p>Überlebe die drei Welten und besiege am Ende jeder Welt den Boss. Deine Figur <b>greift von allein an</b> – du läufst nur und weichst aus (💨 Leertaste oder Knopf).</p>
+  <h3>⬆️ Level-up und Fragen</h3><p>Besiegte Gegner lassen 💎 Kristalle fallen. Leiste voll = Level-up: Erst kommt eine <b>Frage</b>, dann wählst du eine von 3 Karten. <b>Richtig und schnell</b> antworten bringt 🍀 Glück: seltene Karten (<span style="color:var(--r1)">selten</span>, <span style="color:var(--r2)">episch</span>, <span style="color:var(--r3)">legendär</span>) bringen mehrere Stufen auf einmal. Falsch gibt es trotzdem eine Karte, aber fast nur gewöhnliche.</p>
+  <h3>🎒 Plätze: je 4</h3><p>Du hast <b>4 Waffenplätze</b> (die Startwaffe belegt schon einen), <b>4 Buchplätze</b> und <b>4 Plätze für Gegenstände</b>. Wähle weise: Ist ein Bereich voll, kannst du dort nur noch verbessern. Mit 🚫 verbannst du eine Karte, die du nie willst.</p>
+  <h3>⚔️ Waffen (bis Stufe ${MAX_WEP_LVL})</h3><div class="tbl">${W_}</div>
+  <h3>📚 Bücher</h3><div class="tbl">${B}</div>
+  <h3>⭐ Superwaffen</h3><p>Waffe auf Stufe ${MAX_WEP_LVL}, passendes Buch voll und <b>${EVO_STREAK} richtige Antworten in Folge</b> → beim nächsten Level-up kommt die Superwaffe als goldene Karte.</p><div class="tbl">${E}</div>
+  <h3>📦 Kisten und Gegenstände</h3><p>In jeder Welt liegen ${CHESTS_PER_WORLD} Kisten. Mit genug 🪙 Gold läufst du hinein: Frage, dann ein Gegenstand. Jede Kiste wird teurer.</p><div class="tbl">${I}</div>
+  <h3>🏛️ Lernstationen</h3><p>${STATIONS_PER_WORLD} pro Welt (blau auf der Karte). Eine <b>schwere Frage</b>: richtig = 3 Karten, alle mindestens episch. Falsch = nichts. Jede Station gibt es nur einmal.</p>
+  <h3>👑 Elite-Gegner und Fundstücke</h3><p>Etwa jede Minute kommt ein großer, goldener Gegner. Besiegt lässt er eine <b>Gratis-Kiste</b> und ein Fundstück fallen: 🧲 Magnet (alle Kristalle), 💣 Bombe (alle Gegner um dich), 🧪 Trank (halbes Leben).</p>
+  <h3>🔓 Freischalten</h3><ul>${U}</ul>
+  <h3>📓 Hefter</h3><p>Richtige Antworten schalten Seiten in deinem Hefter frei – zum Nachlesen und Lernen.</p>`;
+}
+function openHelp(from){ helpFrom=from; $('helpBody').innerHTML=helpHtml(); show('ovHelp'); }
+$('helpBtn').onclick=()=>openHelp('ovStart'); $('pauseHelp').onclick=()=>openHelp('ovPause'); $('helpClose').onclick=()=>show(helpFrom);
 $('pauseHeft').onclick=()=>openHeft('ovPause');
 function updHeftInfo(){ const id=choice.area.id; $('heftInfo').textContent=`· ${choice.area.icon} ${pagesOpen(id)}/${heftOf(id).length} Seiten`; }
 
@@ -1115,6 +1150,9 @@ const TIPS = {
   abi:   '',   // setzt applyBosses()
   station:'🏛️ Eine <b>Lernstation</b>! Lauf hin: Es kommt eine <b>schwere Frage</b>. Richtig = <b>epische oder legendäre</b> Belohnung, falsch = nichts. Jede Station gibt es nur einmal.',
   elite:'👑 Ein <b>Elite-Gegner</b>: groß, golden und zäh. Besiegst du ihn, lässt er eine <b>Gratis-Kiste</b> und ein Fundstück fallen.',
+  evo:'⭐ Eine Waffe ist auf <b>Stufe 8</b>! Ist auch ihr <b>passendes Buch voll</b> und hast du <b>5 richtige Antworten in Folge</b>, kommt sie als <b>Superwaffe</b> (goldene Karte). Welches Buch passt, steht unter „📖 So geht’s“.',
+  loot:'✨ Ein <b>Fundstück</b> liegt in der Nähe: 🧲 Magnet holt alle Kristalle, 💣 Bombe trifft alle Gegner um dich, 🧪 Trank heilt dich. Einfach hinlaufen!',
+  dash:'💨 <b>Ausweichen:</b> Mit der <b>Leertaste</b> oder dem 💨-Knopf rutschst du ein Stück und bist kurz geschützt. Danach braucht es 2 Sekunden.',
   chest: '📦 Du hast genug 🪙 Gold für eine <b>Kiste</b>! Lauf zu einer braunen Kiste: Erst kommt eine Frage, dann wählst du einen <b>Gegenstand</b> (4 Plätze, je bis Stufe 6).',
   more:  '⚔️ Tipp: Bis zu <b>4 Waffen</b> gleichzeitig. Eine neue Waffe bringt meist mehr als ein kleines Buch.',
 };
