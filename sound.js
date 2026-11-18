@@ -1,8 +1,8 @@
 // Ton: alle Geräusche und die Musik werden im Browser erzeugt (Web Audio), keine Dateien, keine Lizenzen.
-// SND.play('hit') usw.; SND.music(welt) startet die Musik, SND.music(-1) stoppt sie. Schalter in localStorage (ls_sound).
+// SND.play('hit') usw.; SND.music(welt) spielt musik/welt<n>.mp3, SND.music(-1) stoppt sie. Schalter in localStorage (ls_sound).
 'use strict';
 const SND = (() => {
-  let ac = null, master, sfxGain, musGain, noiseBuf, musTimer = null, musWorld = -1, step = 0, nextT = 0;
+  let ac = null, master, sfxGain, noiseBuf, musWorld = -1;
   const last = {};
   const set = (() => { try { return Object.assign({sfx: true, music: true}, JSON.parse(localStorage.getItem('ls_sound') || '{}')); } catch (e) { return {sfx: true, music: true}; } })();
   const save = () => { try { localStorage.setItem('ls_sound', JSON.stringify(set)); } catch (e) {} };
@@ -13,7 +13,6 @@ const SND = (() => {
     ac = new AC(); master = ac.createGain(); master.gain.value = .55; master.connect(ac.destination);
     const comp = ac.createDynamicsCompressor(); comp.connect(master);
     sfxGain = ac.createGain(); sfxGain.gain.value = set.sfx ? 1 : 0; sfxGain.connect(comp);
-    musGain = ac.createGain(); musGain.gain.value = set.music ? .32 : 0; musGain.connect(comp);
     noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     return ac;
   }
@@ -59,35 +58,24 @@ const SND = (() => {
     const now = ac.currentTime; if (GAP[k] && now - (last[k] || 0) < GAP[k]) return; last[k] = now;
     FX[k]();
   }
-  // Musik: kleine Schleife je Welt (Bass + Melodie aus einer Tonleiter), eingeplant im Voraus
-  const SONGS = [
-    {bpm: 112, root: 220, scale: [0, 3, 5, 7, 10], bass: [0, 0, 5, 3], mel: [0, 2, 4, 2, 3, 1, 2, -1, 0, 2, 4, 5, 4, 2, 1, -1]},
-    {bpm: 120, root: 196, scale: [0, 2, 3, 7, 8], bass: [0, 0, 4, 3], mel: [4, 3, 2, -1, 1, 2, 4, -1, 3, 2, 0, -1, 1, 0, 2, -1]},
-    {bpm: 128, root: 233, scale: [0, 2, 4, 7, 9], bass: [0, 3, 4, 2], mel: [2, 4, 5, 4, 2, -1, 3, 4, 0, 2, 3, 2, 4, -1, 5, 4]},
-  ];
-  const note = (S, d, oct = 0) => S.root * Math.pow(2, (S.scale[((d % 5) + 5) % 5] + 12 * (Math.floor(d / 5) + oct)) / 12);
-  function tick() {
-    if (musWorld < 0 || !ac) return;
-    const S = SONGS[musWorld % SONGS.length], beat = 60 / S.bpm / 2;
-    while (nextT < ac.currentTime + .25) {
-      const at = nextT - ac.currentTime, m = S.mel[step % 16];
-      if (step % 4 === 0) tone(note(S, S.bass[Math.floor(step / 4) % 4], -1), beat * 3.6, {type: 'triangle', vol: .5, at, out: musGain});
-      if (m >= 0) tone(note(S, m, 1), beat * .9, {type: 'square', vol: .12, at, out: musGain});
-      if (step % 2 === 0) { const t = ac.currentTime + at, s = ac.createBufferSource(), g = ac.createGain(), fl = ac.createBiquadFilter();
-        s.buffer = noiseBuf; fl.type = 'highpass'; fl.frequency.value = 7000; g.gain.setValueAtTime(.08, t); g.gain.exponentialRampToValueAtTime(.0005, t + .05);
-        s.connect(fl); fl.connect(g); g.connect(musGain); s.start(t); s.stop(t + .06); }
-      nextT += beat; step++;
-    }
+  // Musik: Dateien musik/welt1..3.mp3 (erzeugt mit tools/musik.py), in Schleife; fehlt eine Datei, bleibt es still
+  const MUS_VOL = .45, tracks = {};
+  function track(w) {
+    if (tracks[w] !== undefined) return tracks[w];
+    const a = new Audio(); a.loop = true; a.preload = 'auto'; a.volume = set.music ? MUS_VOL : 0;
+    a.onerror = () => { if (a.src.endsWith('.mp3')) a.src = `musik/welt${w + 1}.wav`; else tracks[w] = null; };
+    a.src = `musik/welt${w + 1}.mp3`; return (tracks[w] = a);
   }
   function music(w) {
     if (w === musWorld) return; musWorld = w;
-    if (musTimer) { clearInterval(musTimer); musTimer = null; }
-    if (w < 0 || !ctx()) return;
-    step = 0; nextT = ac.currentTime + .1; musTimer = setInterval(tick, 100);
+    for (const k in tracks) if (tracks[k]) tracks[k].pause();
+    if (w < 0) return;
+    const a = track(w % 3); if (!a) return; a.currentTime = 0; a.volume = set.music ? MUS_VOL : 0; a.play().catch(() => {});
   }
   function toggle(k) {
-    set[k] = !set[k]; save(); if (!ctx()) return set[k];
-    (k === 'sfx' ? sfxGain : musGain).gain.setTargetAtTime(set[k] ? (k === 'sfx' ? 1 : .32) : 0, ac.currentTime, .05);
+    set[k] = !set[k]; save();
+    if (k === 'music') { for (const t in tracks) if (tracks[t]) tracks[t].volume = set.music ? MUS_VOL : 0; return set[k]; }
+    if (ctx()) sfxGain.gain.setTargetAtTime(set[k] ? 1 : 0, ac.currentTime, .05);
     return set[k];
   }
   // Browser erlauben Ton erst nach einer Berührung/Taste

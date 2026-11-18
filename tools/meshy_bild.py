@@ -14,8 +14,23 @@ STIL = 'single object, stylized low poly cartoon game asset, soft colors, three-
 BILDER = {   # Name → (Bildbeschreibung, Dreiecke)
     'w_busch': ('a round lush green bush with dense rounded leaf clusters and a few small pink flowers', 700),
     'd_busch': ('a small desert shrub with olive green spiky leaves and a few small yellow flowers, growing from a little sand mound', 700),
+    'bug': ('a cute chubby little purple bat creature with big friendly eyes, a small smile and wings spread wide, flying, front view', 2500),
 }
 
+def aus_bild(name, bildpfad, poly=2000):
+    """3D-Modell aus einem vorhandenen Bild (z. B. modelle/vorlagen/*.png)."""
+    import base64
+    uri = 'data:image/png;base64,' + base64.b64encode(open(bildpfad, 'rb').read()).decode()
+    mid = call('POST', BASE + '/image-to-3d', {'image_url': uri, 'ai_model': 'latest', 'should_texture': True, 'should_remesh': True,
+                                               'topology': 'triangle', 'target_polycount': poly, 'target_formats': ['glb']})['result']
+    m = warte(f'{BASE}/image-to-3d/{mid}', name + ' 3D')
+    open(os.path.join(ZIEL, name + '.glb'), 'wb').write(verkleinern(laden(m['model_urls']['glb'])))
+    if m.get('thumbnail_url'): open(os.path.join(ZIEL, name + '.png'), 'wb').write(laden(m['thumbnail_url']))
+    print(f'{name}: fertig', flush=True)
+
+
+if __name__ == '__main__' and len(sys.argv) > 2 and sys.argv[1] == 'aus':   # py -I tools\meshy_bild.py aus <name> <bild.png>
+    aus_bild(sys.argv[2], sys.argv[3]); sys.exit()
 if __name__ == '__main__':
     for name in sys.argv[1:] or list(BILDER):
         text, poly = BILDER[name]

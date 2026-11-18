@@ -249,7 +249,7 @@ const CLASSES = [
 ];
 // Drei Welten nacheinander: je WORLD_T Sekunden, dann kommt der Endboss der Welt. Boss besiegt = nächste Welt.
 const WORLDS = [
-  {id:'wiese', icon:'🌳', name:'Die Wiese', boss:'boss', desc:'Krabbelkäfer, Flackergeister und Brummbrocken. Endboss: 📝 Leistungskontrolle'},
+  {id:'wiese', icon:'🌳', name:'Die Wiese', boss:'boss', desc:'Fledermäuse, Flackergeister und Brummbrocken. Endboss: 📝 Leistungskontrolle'},
   {id:'wueste', icon:'🏜️', name:'Die Wüste', boss:'tutor', desc:'Neu: Spuckpilze spucken Sporen, Schleimis teilen sich. Endboss: 🧑‍🏫 Der Tutor'},
   {id:'eis', icon:'❄️', name:'Das Eisland', boss:'abi', desc:'Neu: Rolligel rollen plötzlich los. Endboss: 🎓 Das Abitur'},
 ];
@@ -326,7 +326,7 @@ const GOLD_DROP = {bug:[.2,1], glitch:[.28,1], lock:[1,4], boss:[1,30], abi:[1,6
 const chestCost = () => 10 + G.opened*5;
 CLASSES.forEach(c=>c.desc=`Start: ${WEAPONS[c.weapon].icon} ${WEAPONS[c.weapon].name}. ${c.pas}`);
 const FOES = {
-  bug:    {r:11, hp:14, sp:62,  dmg:12, xp:1, col:'#f87171', name:'Krabbelkäfer'},
+  bug:    {r:11, hp:14, sp:62,  dmg:12, xp:1, col:'#a78bfa', name:'Fledermaus'},
   glitch: {r:9,  hp:9,  sp:118, dmg:10, xp:1, col:'#e879f9', name:'Flackergeist'},
   lock:   {r:18, hp:70, sp:42,  dmg:22, xp:4, col:'#94a3b8', name:'Brummbrocken'},
   boss:   {r:44, hp:1500, sp:95, dmg:45, xp:40, col:'#ef4444', name:'Die Leistungskontrolle', boss:true},
@@ -496,7 +496,7 @@ function hurt(e,d,crit){
     if(FOES[e.type].boss) bossDown(e);
     if(e.elite){ G.chests.push({x:e.x, y:e.y, free:true}); dropLoot(e.x+40, e.y); toast('👑 Elite besiegt – Gratis-Kiste!'); }
     else if(!FOES[e.type].boss && Math.random()<.006) dropLoot(e.x, e.y);
-    if(e.type==='fork') for(let i=0;i<2;i++){ const m=spawn('bug'); m.x=e.x+(i?10:-10); m.y=e.y; m.r=8; m.hp=m.max=e.max*.35; m.xp=1; }
+    if(e.type==='fork' && !e.small) for(let i=0;i<2;i++){ const m=spawn('fork'); m.small=true; m.x=e.x+(i?10:-10); m.y=e.y; m.r=8; m.hp=m.max=e.max*.35; m.xp=1; }   // zerfällt in zwei kleine Schleimis
     const gd=GOLD_DROP[e.type]; if(Math.random()<gd[0]) G.gems.push({x:e.x+8,y:e.y-6,v:0,gold:gd[1]});
     if(G.p.lifesteal) G.p.hp=Math.min(G.p.maxHp, G.p.hp+G.p.lifesteal);
     const n = FOES[e.type].boss?12:1; for(let i=0;i<n;i++) G.gems.push({x:e.x+(Math.random()-.5)*e.r, y:e.y+(Math.random()-.5)*e.r, v:e.xp/n});

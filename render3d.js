@@ -26,10 +26,18 @@ const R3 = (() => {
 
   // Welten: Boden, Himmel und Deko-Farben
   const THEMES = [
-    {base: '#5f9f45', dots: ['#6cab4e', '#548f3c', '#78b75a', '#4f8738'], spots: ['#fde68a', '#fff'], sky: '#a7d8f0', low: '#4a6b2a', pine: '#2f7d3a', oak: '#4f9d3f', bush: '#3f8f3a', rock: '#9ca3af', trunk: '#7c4a21'},
-    {base: '#d9b26a', dots: ['#e3c07a', '#c99f55', '#edd08f', '#b98d48'], spots: ['#a16207', '#fff7d6'], sky: '#f6dcae', low: '#8a6a32', pine: '#4d7c0f', oak: '#a8a05a', bush: '#a16207', rock: '#c2410c', trunk: '#78350f'},
-    {base: '#dbe7f5', dots: ['#e8f1fb', '#c7d7ec', '#f8fafc', '#cbd5e1'], spots: ['#93c5fd', '#fff'], sky: '#c3d3e6', low: '#7b8ba3', pine: '#1e5162', oak: '#e2e8f0', bush: '#93c5fd', rock: '#64748b', trunk: '#57534e'},
+    {base: '#5f9f45', dots: ['#6cab4e', '#548f3c', '#78b75a', '#4f8738'], spots: ['#fde68a', '#fff'], sky: '#a7d8f0', low: '#4a6b2a', pine: '#2f7d3a', oak: '#4f9d3f', bush: '#3f8f3a', rock: '#9ca3af', trunk: '#7c4a21', path: '#c9a66b'},
+    {base: '#d9b26a', dots: ['#e3c07a', '#c99f55', '#edd08f', '#b98d48'], spots: ['#a16207', '#fff7d6'], sky: '#f6dcae', low: '#8a6a32', pine: '#4d7c0f', oak: '#a8a05a', bush: '#a16207', rock: '#c2410c', trunk: '#78350f', path: '#b8864b'},
+    {base: '#dbe7f5', dots: ['#e8f1fb', '#c7d7ec', '#f8fafc', '#cbd5e1'], spots: ['#93c5fd', '#fff'], sky: '#c3d3e6', low: '#7b8ba3', pine: '#1e5162', oak: '#e2e8f0', bush: '#93c5fd', rock: '#64748b', trunk: '#57534e', path: '#a9bdd6'},
   ];
+  // Bodentextur je Welt aus textur/boden_w|d|e.jpg (von tools/vorlagen.py); bis sie geladen ist bzw. ohne Datei: gemalte Textur
+  const GTEX = {};
+  function loadGroundTex(i) {
+    const f = ['boden_w', 'boden_d', 'boden_e'][i] || 'boden_w';
+    const use = t => { if (worldNow !== i || !ground) return; const r = ground.material.map.repeat.clone(); ground.material.map = t; t.repeat.copy(r); ground.material.needsUpdate = true; };
+    if (GTEX[f]) return use(GTEX[f]);
+    new THREE.TextureLoader().load('textur/' + f + '.jpg', t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; GTEX[f] = t; use(t); }, undefined, () => {});
+  }
   function grassTexture(T = THEMES[0]) {
     const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
     x.fillStyle = T.base; x.fillRect(0, 0, 256, 256);
@@ -48,14 +56,26 @@ const R3 = (() => {
     const sun = new THREE.DirectionalLight('#fff4d6', 1.8); sun.position.set(-300, 700, 250); scene.add(sun);
 
     const tex = grassTexture();
-    const GS = 2 * ARENA + 1600, gg = new THREE.PlaneGeometry(GS, GS, 160, 160).rotateX(-Math.PI / 2), gp = gg.attributes.position, gc = new Float32Array(gp.count * 3);
-    for (let i = 0; i < gp.count; i++) {   // Höhe und Farbe: Berge am Rand grau-felsig
+    const GS = 2 * ARENA + 1600, gg = new THREE.PlaneGeometry(GS, GS, 200, 200).rotateX(-Math.PI / 2), gp = gg.attributes.position, gc = new Float32Array(gp.count * 3), gw = new Float32Array(gp.count);
+    const segD = (x, z, bx, bz) => { const l = bx * bx + bz * bz, u = Math.max(0, Math.min(1, (x * bx + z * bz) / l)); return Math.hypot(x - bx * u, z - bz * u); };
+    for (let i = 0; i < gp.count; i++) {   // Höhe, Farbe (Berge grau-felsig, große helle/dunkle Flecken) und Trampelpfade zu den Wahrzeichen
       const x = gp.getX(i), z = gp.getZ(i), h = ht(x, z); gp.setY(i, h);
-      const k = Math.min(1, Math.max(0, (h - 70) / 260)), c = 1 - .42 * k; gc.set([c, c * .97 + .03 * k, c * .95 + .05 * k], i * 3);
+      const k = Math.min(1, Math.max(0, (h - 70) / 260)), v = 1 + .09 * Math.sin(x / 210 + Math.cos(z / 260)) * Math.cos(z / 180 - .7) + .05 * Math.sin((x + z) / 90);
+      const c = (1 - .42 * k) * v; gc.set([c, c * .97 + .03 * k, c * .95 + .05 * k], i * 3);
+      let pw = 0; for (const m of MARKS) { const wob = 10 * Math.sin((x + z) / 70); pw = Math.max(pw, Math.min(1, Math.max(0, (46 - segD(x, z, m.x, m.z) + wob) / 22))); }
+      gw[i] = pw * (1 - k) * Math.min(1, Math.hypot(x, z) / 120);
     }
-    gg.setAttribute('color', new THREE.BufferAttribute(gc, 3)); gg.computeVertexNormals();
-    tex.repeat.set(GS / 256, GS / 256);
-    ground = new THREE.Mesh(gg, new THREE.MeshLambertMaterial({map: tex, vertexColors: true})); scene.add(ground);
+    gg.setAttribute('color', new THREE.BufferAttribute(gc, 3)); gg.setAttribute('pathw', new THREE.BufferAttribute(gw, 1)); gg.computeVertexNormals();
+    tex.repeat.set(GS / 400, GS / 400);
+    const gmat = new THREE.MeshLambertMaterial({map: tex, vertexColors: true});
+    gmat.onBeforeCompile = sh => {   // Pfade: Bodenfarbe zur Pfadfarbe mischen
+      sh.uniforms.pathCol = {value: new THREE.Color(THEMES[worldNow].path)};
+      sh.vertexShader = 'attribute float pathw;\nvarying float vPath;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vPath = pathw;');
+      sh.fragmentShader = 'uniform vec3 pathCol;\nvarying float vPath;\n' + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, pathCol * (.9 + .2 * fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453)), vPath * .85);');
+      gmat.userData.sh = sh;
+    };
+    ground = new THREE.Mesh(gg, gmat); scene.add(ground);
+    loadGroundTex(0);
 
     // Welt-Deko
     inst('trunk', new THREE.CylinderGeometry(5, 7, 30, 6).translate(0, 15, 0), lam('#7c4a21'), 400);
@@ -144,7 +164,7 @@ const R3 = (() => {
   // 3D-Modelle aus modelle/*.glb (von tools/meshy.py). Fehlt eine Datei, bleiben die einfachen Formen.
   // Kleiner GLB-Leser: erstes Dreiecksnetz, Position/Normale/UV, Farbtextur. Modell wird auf Höhe 1 gebracht, Fuß auf y = 0.
   const MOD = {};
-  const FOE_K = {bug: 1.6, glitch: 1.6, lock: 1.3, spam: 1.5, fork: 1.5, over: 1.5, boss: 1.3, tutor: 1.3, abi: 1.3};   // Modellgröße × Radius
+  const FOE_K = {bug: 2.1, glitch: 1.6, lock: 1.3, spam: 1.5, fork: 1.5, over: 1.5, boss: 1.3, tutor: 1.3, abi: 1.3};   // Modellgröße × Radius
   async function loadGlb(url) {
     const r = await fetch(url); if (!r.ok) return null;
     const buf = await r.arrayBuffer(), dv = new DataView(buf);
@@ -389,7 +409,7 @@ const R3 = (() => {
         const big = e.type === 'boss' || e.type === 'tutor' || e.type === 'abi', s = r * FOE_K[e.type] * (e.flash > 0 ? (big ? 1.06 : 1.2) : 1);
         const ph = e.x * .013 + e.y * .007; let sx2 = s, sy2 = s, sz2 = s, rx = 0, rz = 0; y = 0;
         switch (e.type) {   // Bewegung ohne Skelett: wackeln, watscheln, quetschen, rollen
-          case 'bug': rz = Math.sin(t * 22 + ph * 9) * .14; y = Math.abs(Math.sin(t * 22 + ph * 9)) * 2.5; break;
+          case 'bug': { const f = Math.sin(t * 16 + ph * 9); sx2 = s * (1 + f * .14); sy2 = s * (1 - f * .06); y = r * .9 + Math.sin(t * 4 + ph * 5) * 4 + f * 2; rz = Math.sin(t * 3 + ph * 7) * .1; break; }   // Fledermaus: flattert und schwebt
           case 'glitch': y = r * .8 + Math.sin(t * 5 + ph * 7) * 5; rz = Math.sin(t * 3 + ph * 5) * .22; sy2 = s * (1 + Math.sin(t * 7 + ph) * .07); break;
           case 'lock': rz = Math.sin(t * 6 + ph * 3) * .11; y = Math.abs(Math.sin(t * 6 + ph * 3)) * 5; break;
           case 'spam': { const pf = e.cd < .5 ? 1 + (.5 - e.cd) * .5 : 1; sy2 = s * (1 + Math.sin(t * 9 + ph * 4) * .08) * pf; sx2 = sz2 = s * (1 - Math.sin(t * 9 + ph * 4) * .05) * pf; rz = Math.sin(t * 4.5 + ph) * .08; break; }
@@ -512,7 +532,8 @@ const R3 = (() => {
   }
   function setWorld(i) {
     if (!scene) return; const T = THEMES[i] || THEMES[0];
-    if (i !== worldNow) { const tex = grassTexture(T); tex.repeat.copy(ground.material.map.repeat); ground.material.map.dispose(); ground.material.map = tex; ground.material.needsUpdate = true; worldNow = i; }
+    if (i !== worldNow) { const tex = grassTexture(T); tex.repeat.copy(ground.material.map.repeat); ground.material.map = tex; ground.material.needsUpdate = true; worldNow = i; }
+    loadGroundTex(i); const gsh = ground.material.userData.sh; if (gsh) gsh.uniforms.pathCol.value.set(T.path);
     scene.background.set(T.sky); scene.fog.color.set(T.sky); hemi.groundColor.set(T.low);
     worldNow = i; applyEnv();
   }
