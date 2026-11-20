@@ -217,7 +217,7 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
 <!-- So geht's -->
 <div class="ov" id="ovKeys"><div class="box">
   <h1 style="font-size:22px;text-align:center">⌨️ Tasten</h1>
-  <p class="hint" style="text-align:center">Feld antippen, dann die neue Taste drücken. Jede Aktion hat zwei Tasten.</p>
+  <p class="hint" style="text-align:center">Feld antippen, dann die neue Taste drücken – auch rechte Maustaste, Mausrad-Klick oder Mausrad drehen. Jede Aktion hat zwei Tasten.</p>
   <div id="keysBody" class="keytbl"></div>
   <button class="mini" id="keysReset">↺ Standard</button>
   <button class="btn" id="keysClose">Fertig</button>
@@ -632,7 +632,7 @@ let KB = JSON.parse(JSON.stringify(KB_DEF)), kbWait=null, keysFrom='ovStart';
 try{ const k=JSON.parse(localStorage.getItem('ls_keys')||'null'); if(k) for(const a in KB_DEF) if(Array.isArray(k[a])&&k[a].length===2) KB[a]=k[a]; }catch(e){}
 const kbHas = (a,k) => KB[a].includes(k);
 const kbDown = a => KB[a].some(k=>keys[k]);
-const keyName = k => ({' ':'Leertaste', arrowup:'↑', arrowdown:'↓', arrowleft:'←', arrowright:'→', shift:'Umschalt', escape:'Esc', control:'Strg', alt:'Alt', enter:'Enter', tab:'Tab', backspace:'⌫', '':'–'})[k] || (k.length===1 ? k.toUpperCase() : k[0].toUpperCase()+k.slice(1));
+const keyName = k => ({' ':'Leertaste', arrowup:'↑', arrowdown:'↓', arrowleft:'←', arrowright:'→', shift:'Umschalt', escape:'Esc', control:'Strg', alt:'Alt', enter:'Enter', tab:'Tab', backspace:'⌫', '':'–', mouse1:'Mausrad-Klick', mouse2:'Rechte Maustaste', mouse3:'Maus Zurück', mouse4:'Maus Vor', wheelup:'Mausrad ↑', wheeldown:'Mausrad ↓'})[k] || (k.length===1 ? k.toUpperCase() : k[0].toUpperCase()+k.slice(1));
 function keysHint(){ const n=a=>KB[a].filter(Boolean).map(keyName).join('/');
   $('keysHint').textContent=`${n('up')} ${n('left')} ${n('down')} ${n('right')} oder auf dem Bildschirm ziehen · ${n('dash')} oder 💨 = ausweichen · ${n('pause')} = Pause · Angriffe gehen automatisch`; }
 function renderKeys(){ $('keysBody').innerHTML=Object.keys(KB_DEF).map(a=>`<span>${KB_NAME[a]}</span>`+[0,1].map(i=>{ const w=kbWait&&kbWait.a===a&&kbWait.i===i;
@@ -644,8 +644,21 @@ $('keysReset').onclick=()=>{ KB=JSON.parse(JSON.stringify(KB_DEF)); kbWait=null;
 $('keysClose').onclick=()=>{ kbWait=null; show(keysFrom); };
 $('keysBtn').onclick=()=>openKeys('ovStart'); $('pauseKeys').onclick=()=>openKeys('ovPause'); keysHint();
 addEventListener('keydown', e=>{   // neue Taste übernehmen (vor allem anderen); doppelt belegte Taste wird bei der anderen Aktion frei
-  if(!kbWait) return; e.preventDefault(); e.stopImmediatePropagation(); const k=e.key.toLowerCase();
-  for(const a in KB) KB[a]=KB[a].map(x=>x===k?'':x); KB[kbWait.a][kbWait.i]=k; kbWait=null; saveKeys(); renderKeys(); }, true);
+  if(!kbWait) return; e.preventDefault(); e.stopImmediatePropagation();
+  kbSet(e.key.toLowerCase()); }, true);
+function kbSet(k){ for(const a in KB) KB[a]=KB[a].map(x=>x===k?'':x); KB[kbWait.a][kbWait.i]=k; kbWait=null; saveKeys(); renderKeys(); }
+// Maus: rechte/mittlere/Seitentasten und Mausrad lassen sich auch belegen (die linke Taste bleibt fürs Antippen/Ziehen)
+const mouseKey = e => 'mouse'+e.button, wheelKey = e => e.deltaY<0 ? 'wheelup' : 'wheeldown';
+addEventListener('mousedown', e=>{ if(e.button===0) return; const k=mouseKey(e);
+  if(kbWait){ e.preventDefault(); e.stopImmediatePropagation(); kbSet(k); return; }
+  keys[k]=true; if(mode==='play'){ e.preventDefault(); if(kbHas('dash',k)) dash(); if(kbHas('pause',k)) pause(); } }, true);
+addEventListener('mouseup', e=>{ if(e.button) keys[mouseKey(e)]=false; });
+addEventListener('auxclick', e=>{ if(kbWait||mode==='play') e.preventDefault(); });
+addEventListener('contextmenu', e=>{ if(kbWait||mode==='play'||$('ovKeys').classList.contains('on')) e.preventDefault(); });
+addEventListener('wheel', e=>{ const k=wheelKey(e);
+  if(kbWait){ e.preventDefault(); kbSet(k); return; }
+  if(mode!=='play') return; e.preventDefault(); if(kbHas('dash',k)) dash(); if(kbHas('pause',k)) pause();
+  keys[k]=true; clearTimeout(keys['_'+k]); keys['_'+k]=setTimeout(()=>keys[k]=false, 150); }, {passive:false});
 addEventListener('keydown', e=>{
   if(mode==='quiz'&&Q){ if(!Q.shown){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); showAnswers(); } } else if(!Q.done){ const i='1234'.indexOf(e.key); if(i>=0){ const b=$('qans').children[i]; if(b) b.click(); } } else if((e.key==='Enter'||e.key===' ')&&!$('qNext').disabled){ e.preventDefault(); $('qNext').click(); } return; }
   if(mode==='pick'){ const i='123'.indexOf(e.key); if(i>=0){ const c=$('pkCards').children[i]; if(c) c.click(); } return; }
@@ -654,7 +667,7 @@ $('dashBtn').addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopProp
 // Ausweichen: kurzer Sprint in Laufrichtung, dabei unverwundbar
 function dash(){ if(mode!=='play'||!G) return; const p=G.p; if((p.dashCd||0)>0) return; p.dashCd=2.2; p.dashT=.22; SND.play('dash'); p.inv=Math.max(p.inv||0,.4); G.fx.push({x:p.x,y:p.y,r:40,life:.3,max:.3,col:'#e0f2fe'}); }
 addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
-cv.addEventListener('pointerdown', e=>{ const db=$('dashBtn').getBoundingClientRect(); if(mode==='play' && Math.hypot(e.clientX-(db.left+db.width/2), e.clientY-(db.top+db.height/2))>db.width*.5+34) joy={ox:e.clientX,oy:e.clientY,x:e.clientX,y:e.clientY,id:e.pointerId}; });
+cv.addEventListener('pointerdown', e=>{ if(e.button>0) return; const db=$('dashBtn').getBoundingClientRect(); if(mode==='play' && Math.hypot(e.clientX-(db.left+db.width/2), e.clientY-(db.top+db.height/2))>db.width*.5+34) joy={ox:e.clientX,oy:e.clientY,x:e.clientX,y:e.clientY,id:e.pointerId}; });
 addEventListener('pointermove', e=>{ if(joy&&e.pointerId===joy.id){joy.x=e.clientX;joy.y=e.clientY;} });
 addEventListener('pointerup', e=>{ if(joy&&e.pointerId===joy.id) joy=null; });
 addEventListener('pointercancel', ()=>joy=null);
