@@ -584,7 +584,7 @@ function bossDown(e){
   G.chests.push({x:e.x, y:e.y, free:true}); G.nextWorldT=3; toast(`🏁 ${WORLDS[G.world].name} geschafft! Gratis-Kiste – gleich geht es weiter.`);
 }
 // Arena: feste Kisten und Lernstationen je Welt (Startplatz frei, nie im Baum)
-const ARENA=R3.ARENA, CHESTS=[10,14,18], STATIONS=[7,8,9];
+const ARENA=R3.ARENA, CHESTS=[10,14,18], STATIONS=[9,9,9];
 const inArena = (o, m=30) => { o.x=Math.max(-ARENA+m,Math.min(ARENA-m,o.x)); o.y=Math.max(-ARENA+m,Math.min(ARENA-m,o.y)); };
 function freeSpot(minR, others, gap){
   for(let k=0;k<200;k++){ const x=(Math.random()*2-1)*(ARENA-120), y=(Math.random()*2-1)*(ARENA-120);
@@ -606,8 +606,8 @@ function nextWorld(){
 }
 // Anfang sanft (linearer Teil), danach steigt es schnell (Potenz-Teil)
 // Welt 1 + Anfang Welt 2: ruhig lernen; danach steigt es steil (Potenz pw), Ende Welt 2 ist richtig schwer
-// Spätphase: 0 bis Mitte Welt 2, dann bis 0,6 am Boss von Welt 2, in Welt 3 auf 1 – weniger Level-ups, mehr Kisten, stärkere Gegner
-const late = () => !G ? 0 : G.world>=2 ? .6+.4*Math.min(1,G.wt/60) : G.world===1 ? .6*Math.max(0,Math.min(1,(G.wt-35)/45)) : 0;
+// Spätphase: 0 bis zum ersten Viertel von Welt 2, dann bis 0,6 am Boss von Welt 2, in Welt 3 auf 1 – weniger Level-ups, mehr Kisten, stärkere Gegner
+const late = () => !G ? 0 : G.world>=2 ? .6+.4*Math.min(1,G.wt/60) : G.world===1 ? .6*Math.max(0,Math.min(1,(G.wt-20)/50)) : 0;
 const DIFF = {hp:70, hp2:88, pw:3, sp:150, dmg:240, dmg2:120, spawn:36, spawn2:72};
 const spawnRate = () => Math.min(40, (0.7 + G.t/DIFF.spawn + (G.t/DIFF.spawn2)**2)*(1+.25*late()));
 
@@ -729,7 +729,7 @@ function updStations(){
     if(d<34){ G.stations.splice(G.stations.indexOf(st),1); G.stationMode=true; SND.play('station'); G.fx.push({x:st.x,y:st.y,r:90,life:.5,max:.5,col:'#38bdf8'}); openQuiz(); return; } }
 }
 // Höchstens 2 Level-ups warten: Wer gerade viel einsammelt, bekommt keine Fragen-Lawine (die Leiste bleibt voll)
-function gainXp(v){ v*=(G.p.xpMul+lvlBonus('xp'))*(1-.55*late());   // spät weniger Erfahrung (dafür mehr Kisten)
+function gainXp(v){ v*=(G.p.xpMul+lvlBonus('xp'))*(1-.8*late());   // spät viel weniger Erfahrung: Stärke kommt dann aus Kisten und Lernstationen
   G.xp+=v; if(G.pending>=2) G.xp=Math.min(G.xp,G.need); while(G.xp>=G.need && G.pending<2){ G.xp-=G.need; G.level++; G.need=xpNeed(G.level); G.pending++; SND.play('levelup');
   if(G.luT<=0){ G.luT=.7; G.fx.push({x:G.p.x,y:G.p.y,r:120,life:.6,max:.6,col:'#fde047'}); } } }
 
@@ -1123,7 +1123,7 @@ function helpHtml(){
   <h3>📚 Bücher</h3><div class="tbl">${B}</div>
   <h3>⭐ Superwaffen</h3><p>Waffe auf Stufe ${MAX_WEP_LVL}, passendes Buch voll und <b>${EVO_STREAK} richtige Antworten in Folge</b> → beim nächsten Level-up kommt die Superwaffe als goldene Karte.</p><div class="tbl">${E}</div>
   <h3>📦 Kisten und Gegenstände</h3><p>In den Welten liegen ${CHESTS.join(', ')} Kisten – später gibt es weniger Level-ups, dafür mehr Kisten. Mit genug 🪙 Gold läufst du hinein: Frage, dann ein Gegenstand. Jede Kiste wird teurer.</p><div class="tbl">${I}</div>
-  <h3>🏛️ Lernstationen</h3><p>${STATIONS.join(', ')} pro Welt (blau auf der Karte). Eine Frage der höchsten Stufe dieser Welt (Welt 1 leicht, Welt 2 mittel, Welt 3 schwer): richtig = 3 Karten, alle mindestens episch. Falsch = nichts. Jede Station gibt es nur einmal.</p>
+  <h3>🏛️ Lernstationen</h3><p>${new Set(STATIONS).size===1?STATIONS[0]:STATIONS.join(', ')} pro Welt (blau auf der Karte). Eine Frage der höchsten Stufe dieser Welt (Welt 1 leicht, Welt 2 mittel, Welt 3 schwer): richtig = 3 Karten, alle mindestens episch. Falsch = nichts. Jede Station gibt es nur einmal.</p>
   <h3>👑 Elite-Gegner und Fundstücke</h3><p>Etwa jede Minute kommt ein großer, goldener Gegner. Besiegt lässt er eine <b>Gratis-Kiste</b> und ein Fundstück fallen: 🧲 Magnet (alle Kristalle), 💣 Bombe (alle Gegner um dich), 🧪 Trank (halbes Leben).</p>
   <h3>🔓 Freischalten</h3><ul>${U}</ul>
   <h3>📓 Hefter</h3><p>Richtige Antworten schalten Seiten in deinem Hefter frei – zum Nachlesen und Lernen.</p>`;
