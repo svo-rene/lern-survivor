@@ -45,6 +45,7 @@ p{margin:6px 0;line-height:1.4}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border:2px solid var(--line);border-radius:999px;cursor:pointer;font-size:14px;min-height:40px;user-select:none} .chip.on{border-color:var(--acc);background:#2a2410} .chip input{accent-color:#fde047} .chip small{color:var(--mut)}
 #focusMode label{margin-right:14px;font-size:14px;cursor:pointer}
 .help h3{margin:14px 0 4px;font-size:16px} .help p,.help li{font-size:14px;line-height:1.45;color:var(--ink)} .help ul{margin:4px 0;padding-left:20px} .help .tbl{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:14px}
+.keytbl{display:grid;grid-template-columns:1fr auto auto;gap:6px 8px;align-items:center;margin:10px 0} .keytbl span{font-size:15px} .keytbl .mini{min-width:92px;margin:0} .keytbl .mini.wait{background:#f59e0b;color:#111}
 .mini{background:#334155;color:var(--ink);border:0;border-radius:8px;padding:8px 12px;font:inherit;font-size:13px;cursor:pointer;margin:2px 4px 2px 0}
 .llg{font-size:13px;color:var(--mut)} .llg b{color:var(--ink)}
 .card.sel{border-color:var(--acc)} .card.off{opacity:.4;cursor:default}
@@ -156,8 +157,9 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
     <label class="chk"><input type="checkbox" id="tipsChk"> 💡 Tipps beim Spielen zeigen (kommen beim ersten Spiel automatisch)</label>
     <button class="btn go" id="startBtn">▶ Los geht's</button>
     <button class="btn" id="helpBtn" style="background:#334155;color:var(--ink);font-size:16px">📖 So geht's</button>
+    <button class="btn" id="keysBtn" style="background:#334155;color:var(--ink);font-size:16px">⌨️ Tasten</button>
     <button class="btn" id="heftBtn" style="background:#334155;color:var(--ink);font-size:16px">📓 Mein Hefter <span id="heftInfo" style="font-weight:600;color:var(--mut)"></span></button>
-    <p class="hint" style="text-align:center">WASD / Pfeiltasten oder auf dem Bildschirm ziehen · Leertaste oder 💨 = ausweichen · Angriffe gehen automatisch</p>
+    <p class="hint" style="text-align:center" id="keysHint">WASD / Pfeiltasten oder auf dem Bildschirm ziehen · Leertaste oder 💨 = ausweichen · Angriffe gehen automatisch</p>
   </div>
   <div class="box sbox">
     <h2 style="margin-top:0">🏆 Bestenliste (dieses Gerät)</h2><div id="board"></div>
@@ -192,6 +194,7 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
   <h1>⏸ Pause</h1><div id="pauseInfo"></div>
   <button class="btn" id="resumeBtn">▶ Weiter</button>
   <button class="btn" id="pauseHelp" style="background:#334155;color:var(--ink);font-size:15px">📖 So geht's</button>
+  <button class="btn" id="pauseKeys" style="background:#334155;color:var(--ink);font-size:15px">⌨️ Tasten</button>
   <button class="btn" id="pauseHeft" style="background:#334155;color:var(--ink);font-size:15px">📓 Hefter ansehen</button>
   <div style="display:flex;gap:8px"><button class="btn" id="sndSfx" style="background:#334155;color:var(--ink);font-size:15px"></button><button class="btn" id="sndMus" style="background:#334155;color:var(--ink);font-size:15px"></button></div>
   <button class="btn" id="quitBtn" style="background:#3a1414;color:var(--ink);font-size:15px">⏹ Runde beenden</button>
@@ -212,6 +215,13 @@ body.playing #dashBtn{display:block} #dashBtn.cd{opacity:.35}
 </div></div>
 
 <!-- So geht's -->
+<div class="ov" id="ovKeys"><div class="box">
+  <h1 style="font-size:22px;text-align:center">⌨️ Tasten</h1>
+  <p class="hint" style="text-align:center">Feld antippen, dann die neue Taste drücken. Jede Aktion hat zwei Tasten.</p>
+  <div id="keysBody" class="keytbl"></div>
+  <button class="mini" id="keysReset">↺ Standard</button>
+  <button class="btn" id="keysClose">Fertig</button>
+</div></div>
 <div class="ov" id="ovHelp"><div class="box" style="text-align:left">
   <h1 style="font-size:22px;text-align:center">📖 So geht's</h1>
   <div id="helpBody" class="help"></div>
@@ -543,8 +553,8 @@ function spawn(type){
     else { const q=Math.random(); type = (G.t>100&&q<.12)?'lock':(G.t>40&&q<.12+gl)?'glitch':'bug'; } }
   // Schwierigkeit wächst mit der Zeit immer schneller (eine Runde soll nach einigen Minuten enden)
   const f=FOES[type], hm=1+G.t/DIFF.hp+(G.t/DIFF.hp2)**DIFF.pw, sm=Math.min(3.5,1+G.t/DIFF.sp);
-  const L=late(), big=f.boss, hp=big ? f.hp : f.hp*hm*(1+.45*L);   // Bosse: feste Lebenspunkte
-  const e={type, x:p.x+Math.cos(a)*d, y:p.y+Math.sin(a)*d, r:f.r, hp, max:hp, sp:f.sp*(big?1:sm), dmg:f.dmg*(1+G.t/DIFF.dmg+(G.t/DIFF.dmg2)**2)*(big?1:1+.3*L), xp:f.xp, col:f.col, flash:0, slow:0, ai:2.5, cd:1+Math.random()*2};
+  const L=late(), W3=G.world>=2?1:0, big=f.boss, hp=big ? f.hp : f.hp*hm*(1+.45*L+.3*W3);   // Welt 3: zusätzlich mehr Leben   // Bosse: feste Lebenspunkte
+  const e={type, x:p.x+Math.cos(a)*d, y:p.y+Math.sin(a)*d, r:f.r, hp, max:hp, sp:f.sp*(big?1:sm), dmg:f.dmg*(1+G.t/DIFF.dmg+(G.t/DIFF.dmg2)**2)*(big?1:1+.3*L+.2*W3), xp:f.xp, col:f.col, flash:0, slow:0, ai:2.5, cd:1+Math.random()*2};
   inArena(e, e.r); G.en.push(e); return e;
 }
 // Gegnerische Geschosse (Spam, Bosse)
@@ -581,7 +591,8 @@ function foeAI(e, dt, dx, dy, d){
 }
 // Boss besiegt: Gratis-Kiste und nächste Welt; das Abitur beendet die Runde mit einem Sieg
 function bossDown(e){
-  if(e.type==='abi'){ G.won=true; G.winT=1.5; toast(`${BI.abi} ${BT.sieg}!`); return; }
+  if(e.type==='abi'){ prog.bestWorld=3; saveProg(); checkUnlocks(); G.won=true; G.winT=1.5; toast(`${BI.abi} ${BT.sieg}!`); return; }
+  prog.bestWorld=Math.max(prog.bestWorld||0, G.world+1); saveProg(); checkUnlocks();
   G.chests.push({x:e.x, y:e.y, free:true}); G.nextWorldT=3; toast(`🏁 ${WORLDS[G.world].name} geschafft! Gratis-Kiste – gleich geht es weiter.`);
 }
 // Arena: feste Kisten und Lernstationen je Welt (Startplatz frei, nie im Baum)
@@ -614,10 +625,31 @@ const spawnRate = () => Math.min(40, (0.7 + G.t/DIFF.spawn + (G.t/DIFF.spawn2)**
 
 // ================= Update =================
 const keys = {}; let joy = null;
+// Tastenbelegung (selbst einstellbar, im Browser gespeichert); Antworten 1–4 und Karten 1–3 bleiben fest
+const KB_DEF = {up:['w','arrowup'], down:['s','arrowdown'], left:['a','arrowleft'], right:['d','arrowright'], dash:[' ','shift'], pause:['escape','p']};
+const KB_NAME = {up:'⬆️ Hoch', down:'⬇️ Runter', left:'⬅️ Links', right:'➡️ Rechts', dash:'💨 Ausweichen', pause:'⏸ Pause'};
+let KB = JSON.parse(JSON.stringify(KB_DEF)), kbWait=null, keysFrom='ovStart';
+try{ const k=JSON.parse(localStorage.getItem('ls_keys')||'null'); if(k) for(const a in KB_DEF) if(Array.isArray(k[a])&&k[a].length===2) KB[a]=k[a]; }catch(e){}
+const kbHas = (a,k) => KB[a].includes(k);
+const kbDown = a => KB[a].some(k=>keys[k]);
+const keyName = k => ({' ':'Leertaste', arrowup:'↑', arrowdown:'↓', arrowleft:'←', arrowright:'→', shift:'Umschalt', escape:'Esc', control:'Strg', alt:'Alt', enter:'Enter', tab:'Tab', backspace:'⌫', '':'–'})[k] || (k.length===1 ? k.toUpperCase() : k[0].toUpperCase()+k.slice(1));
+function keysHint(){ const n=a=>KB[a].filter(Boolean).map(keyName).join('/');
+  $('keysHint').textContent=`${n('up')} ${n('left')} ${n('down')} ${n('right')} oder auf dem Bildschirm ziehen · ${n('dash')} oder 💨 = ausweichen · ${n('pause')} = Pause · Angriffe gehen automatisch`; }
+function renderKeys(){ $('keysBody').innerHTML=Object.keys(KB_DEF).map(a=>`<span>${KB_NAME[a]}</span>`+[0,1].map(i=>{ const w=kbWait&&kbWait.a===a&&kbWait.i===i;
+  return `<button class="mini ${w?'wait':''}" data-a="${a}" data-i="${i}">${w?'Taste drücken …':keyName(KB[a][i]||'')}</button>`; }).join('')).join(''); }
+function openKeys(from){ keysFrom=from; kbWait=null; renderKeys(); show('ovKeys'); }
+function saveKeys(){ try{ localStorage.setItem('ls_keys', JSON.stringify(KB)); }catch(e){} keysHint(); }
+$('keysBody').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; kbWait={a:b.dataset.a, i:+b.dataset.i}; renderKeys(); };
+$('keysReset').onclick=()=>{ KB=JSON.parse(JSON.stringify(KB_DEF)); kbWait=null; saveKeys(); renderKeys(); };
+$('keysClose').onclick=()=>{ kbWait=null; show(keysFrom); };
+$('keysBtn').onclick=()=>openKeys('ovStart'); $('pauseKeys').onclick=()=>openKeys('ovPause'); keysHint();
+addEventListener('keydown', e=>{   // neue Taste übernehmen (vor allem anderen); doppelt belegte Taste wird bei der anderen Aktion frei
+  if(!kbWait) return; e.preventDefault(); e.stopImmediatePropagation(); const k=e.key.toLowerCase();
+  for(const a in KB) KB[a]=KB[a].map(x=>x===k?'':x); KB[kbWait.a][kbWait.i]=k; kbWait=null; saveKeys(); renderKeys(); }, true);
 addEventListener('keydown', e=>{
   if(mode==='quiz'&&Q){ if(!Q.shown){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); showAnswers(); } } else if(!Q.done){ const i='1234'.indexOf(e.key); if(i>=0){ const b=$('qans').children[i]; if(b) b.click(); } } else if((e.key==='Enter'||e.key===' ')&&!$('qNext').disabled){ e.preventDefault(); $('qNext').click(); } return; }
   if(mode==='pick'){ const i='123'.indexOf(e.key); if(i>=0){ const c=$('pkCards').children[i]; if(c) c.click(); } return; }
-  keys[e.key.toLowerCase()]=true; if((e.key==='Escape'||e.key==='p')&&mode==='play') pause(); if((e.key===' '||e.key==='Shift')&&mode==='play'){ e.preventDefault(); dash(); } });
+  const k=e.key.toLowerCase(); keys[k]=true; if(kbHas('pause',k)&&mode==='play') pause(); if(kbHas('dash',k)&&mode==='play'){ e.preventDefault(); dash(); } });
 $('dashBtn').addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); dash(); });
 // Ausweichen: kurzer Sprint in Laufrichtung, dabei unverwundbar
 function dash(){ if(mode!=='play'||!G) return; const p=G.p; if((p.dashCd||0)>0) return; p.dashCd=2.2; p.dashT=.22; SND.play('dash'); p.inv=Math.max(p.inv||0,.4); G.fx.push({x:p.x,y:p.y,r:40,life:.3,max:.3,col:'#e0f2fe'}); }
@@ -632,7 +664,7 @@ function update(dt){
   if(G.quizCD>0) G.quizCD-=dt;
   if(G.luT>0){ G.luT-=dt; dt*=.3; }
   const p=G.p; G.t+=dt;
-  let mx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0), my=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
+  let mx=(kbDown('right')?1:0)-(kbDown('left')?1:0), my=(kbDown('down')?1:0)-(kbDown('up')?1:0);
   if(joy){ const dx=joy.x-joy.ox, dy=joy.y-joy.oy, l=Math.hypot(dx,dy); if(l>6){ mx=dx/Math.max(l,45); my=dy/Math.max(l,45); } }
   const l=Math.hypot(mx,my); if(l>1){mx/=l;my/=l;}
   const spd=Math.min(p.speed, 270);   // Obergrenze: sonst kann man allen Gegnern ewig davonlaufen
@@ -720,7 +752,7 @@ function updChests(dt){
   for(const c of G.chests){ let k=0; while(k++<8 && R3.blocked(c.x,c.y,24)) c.x+=c.x>0?-40:40; inArena(c,40); }   // Kiste nie im Baum, nie im Berg
   const cost=chestCost(); if(G.gold>=cost) tip('chest');
   for(const c of G.chests){ if((c.x-p.x)**2+(c.y-p.y)**2 > 34*34) continue;
-    if(c.free || G.gold>=cost){ if(!c.free){ G.gold-=cost; G.opened++; } G.chests.splice(G.chests.indexOf(c),1); G.chestMode=true; SND.play('chest'); openQuiz(); return; }
+    if(c.free || G.gold>=cost){ if(!c.free){ G.gold-=cost; G.opened++; } G.chests.splice(G.chests.indexOf(c),1); prog.chests=(prog.chests||0)+1; G.chestMode=true; SND.play('chest'); openQuiz(); return; }
     if(G.goldMsgT<=0){ toast(`📦 Kiste kostet ${cost} 🪙 – du hast ${G.gold}`); G.goldMsgT=2.5; } }
 }
 // Lernstation: anlaufen = Frage der höchsten Stufe dieser Welt; richtig = epische oder legendäre Belohnung, falsch = nichts
@@ -1052,6 +1084,7 @@ const store={ get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.pars
               set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
 const prog = (()=>{ const old=store.get('ls_prog',null), P=Object.assign({areas:{}, runs:0, wins:0, bestStreak:0, totalOk:0, startGold:0, cls:{}}, old||{});
   if(!old && store.get('ls_scores',[]).length) CLASSES.forEach(c=>P.cls[c.id]=true);   // wer schon gespielt hat, behält alle Klassen
+  if(P.bestWorld===undefined) P.bestWorld = P.wins ? 3 : 0;   // alte Stände: wer gewonnen hat, hat alle Welten geschafft
   return P; })();
 const saveProg = () => store.set('ls_prog', prog);
 const qKey = f => { let h=7; for(const c of f.q) h=(h*31+c.charCodeAt(0))|0; return (h>>>0).toString(36); };
@@ -1072,11 +1105,17 @@ function noteAnswer(f, ok){
 }
 // Klassen werden über Lernziele freigeschaltet (Zauberer ist immer offen)
 // Freischaltungen über Lernziele (über alle Runden): Klassen und Waffen
+// Start: 4 Grundklassen (Zauberer, Waldläufer, Alchemist, Ritter) mit ihren Waffen + Frostring und Schutzschild; der Rest kommt über Erfolge
 const UNLOCK = {
+  gelehrter:{txt:'wenn du Welt 1 schaffst', ok:()=>(prog.bestWorld||0)>=1, st:()=>`beste Welt ${Math.min(3,(prog.bestWorld||0)+1)}`},
   tueftler: {txt:'mit 50 richtigen Antworten', ok:()=>prog.totalOk>=50, st:()=>`${Math.min(50,prog.totalOk)}/50 richtig`},
-  entdecker:{txt:'mit 3 gelösten Lernstationen', ok:()=>(prog.stations||0)>=3, st:()=>`${Math.min(3,prog.stations||0)}/3 Stationen`},
+  entdecker:{txt:'mit 10 gelösten Lernstationen', ok:()=>(prog.stations||0)>=10, st:()=>`${Math.min(10,prog.stations||0)}/10 Stationen`},
 };
 const WUNLOCK = {
+  blitz: {txt:'mit der Gelehrten (Welt 1 schaffen)', ok:()=>clsOpen(CLASSES.find(c=>c.id==='gelehrter'))},
+  aura:  {txt:'mit 25 richtigen Antworten', ok:()=>prog.totalOk>=25, st:()=>`${Math.min(25,prog.totalOk)}/25 richtig`},
+  klinge:{txt:'mit 15 geöffneten Kisten', ok:()=>(prog.chests||0)>=15, st:()=>`${Math.min(15,prog.chests||0)}/15 Kisten`},
+  meteor:{txt:'wenn du Welt 2 schaffst', ok:()=>(prog.bestWorld||0)>=2},
   eule:  {txt:'mit der Tüftlerin', ok:()=>clsOpen(CLASSES.find(c=>c.id==='tueftler'))},
   strahl:{txt:'mit dem Entdecker', ok:()=>clsOpen(CLASSES.find(c=>c.id==='entdecker'))},
   welle: {txt:'mit Streak 10', ok:()=>prog.bestStreak>=10, st:()=>`bester Streak ${prog.bestStreak}/10`},
