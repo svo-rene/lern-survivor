@@ -20,6 +20,12 @@
     {d: 1, t: '1.1/1.2 Datenbanken und relationales Datenmodell', q: 'Bei einer Überweisung stürzt das System nach der Abbuchung, aber vor der Gutschrift ab. Welche ACID-Eigenschaft sorgt dafür, dass die Abbuchung zurückgenommen wird?',
       a: ['Atomarität (Atomicity)', 'Konsistenz (Consistency)', 'Isolation', 'Dauerhaftigkeit (Durability)'],
       e: 'Eine Transaktion wird ganz oder gar nicht ausgeführt; bei einem Fehler werden alle Änderungen zurückgenommen (Rollback).', src: 'OPAL LB9 1.2, 2.1'},
+    {d: 1, t: '1.1/1.2 Datenbanken und relationales Datenmodell', q: 'Buch(ISBN, Titel, Autor, Jahr): Welches Attribut eignet sich als Primärschlüssel?',
+      a: ['ISBN', 'Titel', 'Autor', 'Jahr'],
+      e: 'Die ISBN ist für jedes Buch eindeutig und nie leer. Titel, Autor und Jahr können bei mehreren Büchern gleich sein.', src: 'OPAL LB9 1.2'},
+    {d: 1, t: '1.1/1.2 Datenbanken und relationales Datenmodell', q: 'Wie werden im Relationenschema Primärschlüssel und Fremdschlüssel gekennzeichnet?',
+      a: ['Primärschlüssel unterstrichen, Fremdschlüssel mit ↑', 'Primärschlüssel mit ↑, Fremdschlüssel unterstrichen', 'beide unterstrichen, der Fremdschlüssel zusätzlich fett', 'Primärschlüssel in Klammern, Fremdschlüssel mit *'],
+      e: 'Beispiel: Schueler(SchuelerID, Name, ↑Klasse) mit unterstrichener SchuelerID.', src: 'OPAL LB9 1.2'},
 
     // ---------- 1.3 SELECT ----------
     {d: 1, t: '1.3 SELECT', q: 'In welcher Reihenfolge arbeitet die Datenbank eine Abfrage mit SELECT, FROM, WHERE und ORDER BY ab?',
@@ -28,6 +34,15 @@
     {d: 2, t: '1.3 SELECT', q: 'Gesucht: Vorname und Geburtsdatum aller Studierenden, jüngste Person zuerst, Geburtsdatum umbenannt in Geboren. Welche Abfrage passt?',
       a: ['`SELECT Vorname, Geburtsdatum AS Geboren FROM Studenten ORDER BY Geburtsdatum DESC;`', '`SELECT Vorname, Geburtsdatum AS Geboren FROM Studenten ORDER BY Geburtsdatum ASC;`', '`SELECT Vorname, Geboren AS Geburtsdatum FROM Studenten ORDER BY Geburtsdatum DESC;`', '`SELECT Vorname, Geburtsdatum FROM Studenten WHERE Geboren DESC;`'],
       e: 'Jüngste zuerst = spätestes Datum oben = DESC. Mit AS steht der neue Name hinter dem alten.', src: 'OPAL LB9 1.3'},
+    {d: 1, t: '1.3 SELECT', q: 'Wie sortiert `ORDER BY Punkte` ohne weiteren Zusatz?',
+      a: ['aufsteigend (ASC), kleinster Wert zuerst', 'absteigend (DESC), größter Wert zuerst', 'gar nicht, ohne ASC/DESC gibt es einen Fehler', 'in der Reihenfolge, in der die Zeilen eingefügt wurden'],
+      e: 'ASC ist der Standard. Für „größter zuerst“ schreibt man ORDER BY Punkte DESC.', src: 'OPAL LB9 1.3'},
+    {d: 1, t: '1.3 SELECT', q: 'Welcher Name steht in der ersten Ergebniszeile?\n`Schueler\nName | Klasse | Punkte\nAnna | 10a    | 12\nBen  | 10b    | 8\nCem  | 10a    | 15\nDana | 10b    | 11\nEmil | 10a    | 7\n\nSELECT Name FROM Schueler ORDER BY Punkte DESC;`',
+      a: ['Cem', 'Emil', 'Anna', 'Dana'],
+      e: 'DESC sortiert absteigend: Cem (15), Anna (12), Dana (11), Ben (8), Emil (7).', src: 'OPAL LB9 1.3'},
+    {d: 1, t: '1.3 SELECT', q: 'Gesucht: die Namen aller Schüler der 10a, alphabetisch sortiert. Welche Abfrage passt?',
+      a: ['`SELECT Name FROM Schueler WHERE Klasse = \'10a\' ORDER BY Name;`', '`SELECT Name FROM Schueler ORDER BY Name WHERE Klasse = \'10a\';`', '`SELECT Name WHERE Klasse = \'10a\' FROM Schueler ORDER BY Name;`', '`SELECT Schueler FROM Name WHERE Klasse = \'10a\' ORDER BY Name;`'],
+      e: 'Feste Reihenfolge beim Schreiben: SELECT – FROM – WHERE – ORDER BY.', src: 'OPAL LB9 1.3'},
 
     // ---------- 1.4 WHERE und LIKE ----------
     {d: 2, t: '1.4 WHERE und LIKE', q: 'Gesucht sind „alle Studierenden mit Nachname Müller und Schmidt“. Welche Bedingung ist richtig?',
@@ -42,6 +57,12 @@
     {d: 3, t: '1.4 WHERE und LIKE', q: 'Ein Zeuge sah einen blauen oder schwarzen BMW. Welche Bedingung findet genau diese Autos?',
       a: ['`WHERE (Farbe = \'blau\' OR Farbe = \'schwarz\') AND Automarke = \'BMW\'`', '`WHERE Farbe = \'blau\' OR Farbe = \'schwarz\' AND Automarke = \'BMW\'`', '`WHERE Farbe = \'blau\' AND Farbe = \'schwarz\' AND Automarke = \'BMW\'`', '`WHERE Farbe IN (\'blau\', \'schwarz\') OR Automarke = \'BMW\'`'],
       e: 'AND bindet stärker als OR. Ohne Klammern kämen alle blauen Autos jeder Marke dazu. Die OR-Bedingungen gehören in Klammern.', src: 'OPAL LB9 1.9'},
+    {d: 1, t: '1.4 WHERE und LIKE', q: 'Welche Namen liefert die Abfrage?\n`Schueler\nName | Klasse | Punkte\nAnna | 10a    | 12\nBen  | 10b    | 8\nCem  | 10a    | 15\nDana | 10b    | 11\nEmil | 10a    | 7\n\nSELECT Name FROM Schueler WHERE Punkte > 10;`',
+      a: ['Anna, Cem und Dana', 'Anna und Cem', 'Ben und Emil', 'Anna, Ben, Cem und Dana'],
+      e: 'Gefiltert wird Zeile für Zeile: 12, 15 und 11 sind größer als 10. Bei >= 10 käme niemand dazu.', src: 'OPAL LB9 1.4'},
+    {d: 2, t: '1.4 WHERE und LIKE', q: 'Welche Namen liefert die Abfrage?\n`Namen: Anna, Ben, Cem, Dana, Emil\n\nSELECT Name FROM Schueler WHERE Name LIKE \'%n%\';`',
+      a: ['Anna, Ben und Dana', 'nur Anna', 'Anna und Dana', 'keinen, weil kein Name mit n beginnt'],
+      e: '%n% heißt: irgendwo ein n, davor und dahinter beliebig viel. Mit \'n%\' wären es Namen, die mit n beginnen.', src: 'OPAL LB9 1.4'},
 
     // ---------- 1.5 Aggregatfunktionen ----------
     {d: 2, t: '1.5 Aggregatfunktionen', q: 'Was liefert die Abfrage?\n`Kurs\nKursNr | Fach  | Stunden\n1      | Mathe | 5\n2      | Info  | 5\n3      | Kunst | 2\n4      | Sport | NULL\n\nSELECT COUNT(Stunden) FROM Kurs;`',
@@ -59,6 +80,18 @@
     {d: 3, t: '1.5 Aggregatfunktionen', q: 'Gesucht sind Produkte, die im Januar 2023 zusammen mehr als 1500 € Umsatz brachten. Wohin gehören die beiden Bedingungen?',
       a: ['`Datum LIKE \'2023-01%\'` ins WHERE, `SUM(Menge * Preis) > 1500` ins HAVING', '`SUM(Menge * Preis) > 1500` ins WHERE, `Datum LIKE \'2023-01%\'` ins HAVING', 'beide Bedingungen ins HAVING, da die Abfrage mit GROUP BY arbeitet', 'beide Bedingungen ins WHERE, da WHERE immer vor HAVING kommt'],
       e: 'Das Datum ist eine Eigenschaft der einzelnen Zeile und muss vor dem Gruppieren greifen; der Umsatz entsteht erst je Gruppe.', src: 'OPAL LB9 1.5 (Beispiel 9)'},
+    {d: 1, t: '1.5 Aggregatfunktionen', q: 'Was liefert die Abfrage?\n`Schueler\nName | Klasse | Punkte\nAnna | 10a    | 12\nBen  | 10b    | 8\nCem  | 10a    | 15\nDana | 10b    | 11\nEmil | 10a    | 7\n\nSELECT COUNT(*) FROM Schueler WHERE Klasse = \'10a\';`',
+      a: ['3', '5', '2', '34'],
+      e: 'Erst filtert WHERE die Zeilen der 10a (Anna, Cem, Emil), dann zählt COUNT(*) sie.', src: 'OPAL LB9 1.5'},
+    {d: 1, t: '1.5 Aggregatfunktionen', q: 'Was liefert die Abfrage?\n`Schueler\nName | Klasse | Punkte\nAnna | 10a    | 12\nBen  | 10b    | 8\nCem  | 10a    | 15\nDana | 10b    | 11\nEmil | 10a    | 7\n\nSELECT SUM(Punkte) FROM Schueler WHERE Klasse = \'10b\';`',
+      a: ['19', '2', '53', '11'],
+      e: 'Die 10b sind Ben (8) und Dana (11): 8 + 11 = 19. 53 wäre die Summe aller Zeilen.', src: 'OPAL LB9 1.5'},
+    {d: 1, t: '1.5 Aggregatfunktionen', q: 'Was liefert die Abfrage?\n`Schueler\nName | Klasse | Punkte\nAnna | 10a    | 12\nBen  | 10b    | 8\nCem  | 10a    | 15\nDana | 10b    | 11\nEmil | 10a    | 7\n\nSELECT Klasse, COUNT(*) FROM Schueler GROUP BY Klasse;`',
+      a: ['10a 3 und 10b 2', '10a 1 und 10b 1', '5', 'Anna 1, Ben 1, Cem 1, Dana 1, Emil 1'],
+      e: 'GROUP BY bildet je Klasse einen Stapel; COUNT(*) zählt die Zeilen jedes Stapels.', src: 'OPAL LB9 1.5'},
+    {d: 2, t: '1.5 Aggregatfunktionen', q: 'Was liefert die Abfrage?\n`Schueler\nName | Klasse | Punkte\nAnna | 10a    | 12\nBen  | 10b    | 8\nCem  | 10a    | 15\nDana | 10b    | 11\nEmil | 10a    | 7\n\nSELECT Klasse FROM Schueler\nGROUP BY Klasse\nHAVING AVG(Punkte) > 10;`',
+      a: ['nur 10a', 'nur 10b', '10a und 10b', 'keine Zeile'],
+      e: 'Durchschnitt 10a: (12 + 15 + 7) / 3 ≈ 11,3; 10b: (8 + 11) / 2 = 9,5. HAVING behält nur Gruppen über 10.', src: 'OPAL LB9 1.5'},
 
     // ---------- 1.6 Joins ----------
     {d: 2, t: '1.6 Joins', q: 'Wie viele Zeilen liefert die Abfrage?\n`Schueler: (1, Anna, 1), (2, Ben, 2), (3, Cem, 1), (4, Dana, NULL)\nKlasse:   (1, 10a), (2, 10b), (3, 10c)\n\nSELECT Name, Bez FROM Schueler\nINNER JOIN Klasse ON Schueler.KlasseID = Klasse.KlasseID;`',
@@ -70,6 +103,9 @@
     {d: 3, t: '1.6 Joins', q: 'Tabellen Schueler(SNr, Name, ↑KlasseID) und Klasse(KlasseID, Bez); in der 10c ist niemand. Welche Abfrage zeigt auch die 10c?',
       a: ['`SELECT Bez, Name FROM Klasse LEFT JOIN Schueler ON Klasse.KlasseID = Schueler.KlasseID;`', '`SELECT Bez, Name FROM Schueler LEFT JOIN Klasse ON Schueler.KlasseID = Klasse.KlasseID;`', '`SELECT Bez, Name FROM Schueler INNER JOIN Klasse ON Schueler.KlasseID = Klasse.KlasseID;`', '`SELECT Bez, Name FROM Klasse INNER JOIN Schueler ON Klasse.KlasseID = Schueler.KlasseID;`'],
       e: 'Die Tabelle, deren Zeilen alle erscheinen sollen, muss links stehen. Die Klasse ohne Schüler bekommt dann NULL bei Name.', src: 'OPAL LB9 1.6'},
+    {d: 1, t: '1.6 Joins', q: 'Welche Namen liefert die Abfrage?\n`Schueler: (1, Anna, 1), (2, Ben, 2), (3, Cem, 1)\nKlasse:   (1, 10a, Kern), (2, 10b, Ilg)\n\nSELECT Name FROM Schueler\nINNER JOIN Klasse ON Schueler.KlasseID = Klasse.KlasseID\nWHERE Lehrer = \'Kern\';`',
+      a: ['Anna und Cem', 'nur Ben', 'Anna, Ben und Cem', 'nur Anna'],
+      e: 'Der Join hängt an jede Schülerzeile die passende Klasse. Anna und Cem haben KlasseID 1, die 10a von Herrn Kern.', src: 'OPAL LB9 1.6'},
 
     // ---------- 1.8 CRUD ----------
     {d: 1, t: '1.8 CRUD', q: 'Was ist der „Sicherheitsgriff“ vor einem UPDATE oder DELETE?',
@@ -78,6 +114,12 @@
     {d: 3, t: '1.8 CRUD', q: 'Bei aktiven Fremdschlüsseln soll ein Besucher samt seinen Buchungen gelöscht werden (bookings verweist auf visitors). Welche Reihenfolge funktioniert?',
       a: ['erst die Buchungen löschen, dann den Besucher', 'erst den Besucher löschen, dann die Buchungen', 'die Reihenfolge ist egal', 'nur den Besucher – die Buchungen verschwinden von selbst'],
       e: 'Zeilen, auf die noch ein Fremdschlüssel verweist, lassen sich nicht löschen (referentielle Integrität). Beim Einfügen gilt umgekehrt: erst die Haupttabelle.', src: 'OPAL LB9 1.20; Abi 7.1'},
+    {d: 1, t: '1.8 CRUD', q: 'Mit welchem SQL-Befehl fügt man einen neuen Datensatz in eine Tabelle ein?',
+      a: ['`INSERT INTO`', '`UPDATE`', '`ADD ROW`', '`CREATE TABLE`'],
+      e: 'INSERT INTO T (Sp1, Sp2) VALUES (W1, W2); UPDATE ändert vorhandene Zeilen, CREATE TABLE legt die Tabelle an.', src: 'OPAL LB9 1.8'},
+    {d: 1, t: '1.8 CRUD', q: 'Was bewirkt `UPDATE Schueler SET Klasse = \'10c\';`?',
+      a: ['Alle Schüler kommen in die 10c.', 'Nur der erste Schüler kommt in die 10c.', 'Es gibt eine Fehlermeldung, weil WHERE fehlt.', 'Eine neue Spalte 10c wird angelegt.'],
+      e: 'Ohne WHERE trifft UPDATE jede Zeile. Mit WHERE SchuelerID = 7 nur die gewünschte.', src: 'OPAL LB9 1.8'},
 
     // ---------- 1.10 Entity-Relationship-Modell ----------
     {d: 1, t: '1.10 Entity-Relationship-Modell', q: 'Wie werden im ER-Modell Entität, Attribut und Beziehung dargestellt?',
@@ -95,6 +137,9 @@
     {d: 3, t: '1.10 Entity-Relationship-Modell', q: 'Zwischen Teilnehmer und Workshop wurde „Anmeldung“ als Entität modelliert. Mit welcher Prüffrage erkennt man den Fehler?',
       a: ['Existiert es ohne die beiden Partner? – Nein, also ist es eine Beziehung.', 'Lässt es sich im Singular aufzählen? – Nein, also ist es ein Attribut.', 'Hat es einen eigenen Primärschlüssel? – Nein, also ist es ein Attribut.', 'Steht es im Text als Substantiv? – Ja, also bleibt es eine Entität.'],
       e: 'Eine Anmeldung ohne Teilnehmer und Workshop ergibt keinen Sinn; sie ist die Beziehung „nimmt teil“.', src: 'OPAL LB9 1.10'},
+    {d: 1, t: '1.10 Entity-Relationship-Modell', q: 'Ein Kunde gibt mehrere Bestellungen auf, jede Bestellung gehört zu genau einem Kunden. Welche Kardinalität hat die Beziehung Kunde – Bestellung?',
+      a: ['1:n', 'm:n', '1:1', 'n:1 (Kunde ist die n-Seite)'],
+      e: 'Ein Kunde – viele Bestellungen; eine Bestellung – ein Kunde. Im Relationenmodell kommt ↑KundenNr zur Bestellung (n-Seite).', src: 'OPAL LB9 1.10'},
 
     // ---------- 1.11 Relationenmodell ----------
     {d: 1, t: '1.11 Relationenmodell', q: 'Klasse und Schüler stehen in einer 1:n-Beziehung. Wohin kommt der Fremdschlüssel?',
@@ -123,6 +168,12 @@
     {d: 3, t: '1.13 Anomalien', q: 'In einem Spielplan finden zwei Spiele am 2026-05-09 statt, das Datum steht zweimal. Ist das Redundanz?',
       a: ['Nein – zwei Spiele am selben Tag sind zwei getrennte Tatsachen.', 'Ja, das mehrfach gespeicherte Datum muss in eine eigene Relation.', 'Ja, die Spalte Datum verletzt damit die erste Normalform.', 'Ja, durch das doppelte Datum droht eine Löschanomalie.'],
       e: 'Echte Redundanz ist dieselbe Tatsache an mehreren Stellen (z. B. „Füchse – Frau Ilg“), nicht ein zufällig gleicher Wert.', src: 'OPAL LB9 1.13'},
+    {d: 1, t: '1.13 Anomalien', q: 'Tabelle (SchülerID, Name, Klasse, Klassenlehrer): Frau Ilg heiratet und heißt nun Berg. Der Name muss in 28 Zeilen geändert werden, in einer wird es vergessen. Welche Anomalie ist das?',
+      a: ['Änderungsanomalie', 'Einfügeanomalie', 'Löschanomalie', 'transitive Anomalie'],
+      e: 'Weil die Information mehrfach gespeichert ist (Redundanz), widersprechen sich die Daten danach.', src: 'OPAL LB9 1.13'},
+    {d: 1, t: '1.13 Anomalien', q: 'Tabelle (SchülerID, Name, Klasse, Klassenlehrer): Der einzige Schüler der 9c wird gelöscht – damit ist auch weg, wer die 9c leitet. Welche Anomalie ist das?',
+      a: ['Löschanomalie', 'Einfügeanomalie', 'Änderungsanomalie', 'keine, das ist gewollt'],
+      e: 'Beim Löschen geht ungewollt eine andere Information verloren. Abhilfe: Klasse(Klasse, Klassenlehrer) als eigene Relation.', src: 'OPAL LB9 1.13'},
 
     // ---------- 1.14–1.16 Normalformen ----------
     {d: 1, t: '1.14–1.16 Normalformen', q: 'Wann befindet sich eine Relation in der ersten Normalform?',
@@ -131,7 +182,7 @@
     {d: 2, t: '1.14–1.16 Normalformen', q: 'Schüler(SchülerID, Name, Fächer) mit „Mathematik, Physik, Informatik“ in einer Zelle wird in die 1NF gebracht (je Fach eine Zeile). Wie lautet der neue Primärschlüssel?',
       a: ['(SchülerID, Fach)', 'SchülerID', 'Fach', '(SchülerID, Name)'],
       e: 'Die SchülerID steht jetzt mehrfach da. Weil Name nur von SchülerID abhängt, ist die Tabelle danach noch nicht in der 2NF.', src: 'OPAL LB9 1.14'},
-    {d: 1, t: '1.14–1.16 Normalformen', q: 'Ist das Attribut „Name“ („Lea Sommer“) atomar?',
+    {d: 2, t: '1.14–1.16 Normalformen', q: 'Ist das Attribut „Name“ („Lea Sommer“) atomar?',
       a: ['Das hängt von der Aufgabe ab, etwa vom Sortieren nach Nachname.', 'Ja, ein Name ist immer atomar, weil er eine Einheit bildet.', 'Nein, Namen müssen immer in Vor- und Nachname zerlegt werden.', 'Nur dann, wenn er keine Leerzeichen oder Bindestriche enthält.'],
       e: 'Wer jede Spalte so weit wie möglich zerlegt, gewinnt nichts – „je mehr Spalten, desto besser“ stimmt nicht.', src: 'OPAL LB9 1.14'},
     {d: 1, t: '1.14–1.16 Normalformen', q: 'In welchem Fall kann die zweite Normalform überhaupt verletzt sein?',
@@ -152,6 +203,12 @@
     {d: 3, t: '1.14–1.16 Normalformen', q: 'Beim Normalisieren wird Ort(PLZ, Ort) ausgelagert und die PLZ aus Schueler gestrichen. Was ist die Folge?',
       a: ['Der Wohnort der Schüler ist nicht mehr zuordenbar.', 'Nichts, der Ort ist ja noch in der Relation Ort gespeichert.', 'Die Relation Schueler verletzt danach die zweite Normalform.', 'Es entsteht eine Einfügeanomalie in der Relation Ort.'],
       e: 'Einer der vier typischen Klausurfehler: Der Bestimmer muss als Fremdschlüssel zurückbleiben, damit die Daten wieder zusammengesetzt werden können.', src: 'OPAL LB9 1.16'},
+    {d: 1, t: '1.14–1.16 Normalformen', q: 'Wann ist eine Relation in der dritten Normalform (3NF)?',
+      a: ['2NF und kein Nicht-Schlüssel-Attribut hängt transitiv vom Schlüssel ab', '1NF und alle Nicht-Schlüssel-Attribute hängen vom ganzen Schlüssel ab', 'alle Werte sind atomar und jede Spalte hat einen eindeutigen Namen', 'jede Relation hat mindestens drei Attribute und einen Fremdschlüssel'],
+      e: 'Die Normalformen bauen aufeinander auf: 3NF setzt 2NF voraus, 2NF setzt 1NF voraus.', src: 'OPAL LB9 1.16'},
+    {d: 1, t: '1.14–1.16 Normalformen', q: 'Kunde(KundenNr, Name, Telefon) enthält bei Anna „0351 123, 0172 456“. Welche Normalform ist verletzt?',
+      a: ['1NF – Telefon ist nicht atomar', '2NF – Telefon hängt nur von einem Teil des Schlüssels ab', '3NF – Telefon hängt transitiv von Name ab', 'keine, mehrere Nummern in einer Zelle sind erlaubt'],
+      e: 'Eine Zelle darf nur einen Wert enthalten. Lösung: Telefonnummern in eine eigene Relation Telefon(↑KundenNr, Nummer).', src: 'OPAL LB9 1.14'},
 
     // ---------- 1.19 Subselects ----------
     {d: 2, t: '1.19 Subselects', q: 'Was liefert die Abfrage?\n`Schueler: (Anna, 1.0), (Ben, 2.0), (Cem, 3.0), (Dana, 4.0)\n\nSELECT Name FROM Schueler\nWHERE Note < (SELECT AVG(Note) FROM Schueler);`',
@@ -173,13 +230,13 @@
       e: 'ACID-Konsistenz gilt auch für eine einzelne Datenbank; CAP-Konsistenz ist nur bei verteilten Systemen ein Thema.', src: 'OPAL LB9 2.1'},
 
     // ---------- 2.2/2.3 NoSQL und Key-Value ----------
-    {d: 1, t: '2.2/2.3 NoSQL und Key-Value', q: 'Warum kann ein Key-Value-Store die Frage „alle Nutzer aus Dresden“ nicht beantworten?',
+    {d: 2, t: '2.2/2.3 NoSQL und Key-Value', q: 'Warum kann ein Key-Value-Store die Frage „alle Nutzer aus Dresden“ nicht beantworten?',
       a: ['Er greift nur über den Schlüssel zu, nicht über den Wert.', 'Er speichert nur Zahlen, aber keine Texte wie Städtenamen.', 'Er hat ein festes Schema, in dem die Spalte Stadt fehlt.', 'Er ist auf AP ausgelegt und liefert deshalb falsche Werte.'],
       e: 'Deshalb steckt die Logik in den Schlüsseln (z. B. nutzer:1:punkte); für jede Frage braucht man einen eigenen Schlüssel.', src: 'OPAL LB9 2.2, 2.3'},
-    {d: 1, t: '2.2/2.3 NoSQL und Key-Value', q: 'Welches Datenbankmodell beantwortet die Frage „Über wie viele Ecken kennt Anna Clara?“ am einfachsten?',
+    {d: 2, t: '2.2/2.3 NoSQL und Key-Value', q: 'Welches Datenbankmodell beantwortet die Frage „Über wie viele Ecken kennt Anna Clara?“ am einfachsten?',
       a: ['Graph-Datenbank', 'relationale Datenbank', 'Key-Value-Datenbank', 'hierarchische Datenbank'],
       e: 'Eine Graph-Datenbank folgt den gespeicherten Kanten; relational bräuchte jede weitere Stufe zwei zusätzliche JOINs.', src: 'OPAL LB9 2.2'},
-    {d: 1, t: '2.2/2.3 NoSQL und Key-Value', q: 'Warum passen Schüler, die mehrere Kurse belegen, schlecht in ein hierarchisches Datenbankmodell?',
+    {d: 2, t: '2.2/2.3 NoSQL und Key-Value', q: 'Warum passen Schüler, die mehrere Kurse belegen, schlecht in ein hierarchisches Datenbankmodell?',
       a: ['Jeder Datensatz hat genau einen Elternknoten; m:n erzwingt Redundanz.', 'Hierarchische Datenbanken speichern nur Zahlen, keine Namen.', 'Im Baum gibt es keine 1:n-Beziehungen, nur m:n-Beziehungen.', 'Hierarchische Datenbanken erlauben nur 1:1-Beziehungen zwischen Knoten.'],
       e: 'Anna müsste unter jedem Kurs erneut gespeichert werden – genau dieses Problem löste das relationale Modell.', src: 'OPAL LB9 2.2'},
     {d: 2, t: '2.2/2.3 NoSQL und Key-Value', q: 'Was gibt das Programm aus?\n`nutzer = {"anna": {"stadt": "Dresden", "punkte": 12}}\nnutzer["anna"]["punkte"] += 3\nprint(nutzer["anna"]["punkte"], nutzer.get("ben", 0))`',
@@ -229,7 +286,7 @@
     {d: 1, t: '3.8 Visualisieren, 3.10 JSON, 3.11 API', q: 'Eine Web-API antwortet mit dem Statuscode 404. Was bedeutet das?',
       a: ['Die angefragte Ressource wurde nicht gefunden.', 'Die Anfrage war erfolgreich, die Daten kommen als JSON.', 'Die Antwort liegt im XML-Format statt im JSON-Format.', 'Der Server verlangt eine Anmeldung mit Passwort.'],
       e: '200 = OK, 404 = nicht gefunden. Die Daten kommen meist als JSON, `.json()` macht daraus Dictionaries und Listen.', src: 'OPAL LB9 3.11'},
-    {d: 1, t: '3.8 Visualisieren, 3.10 JSON, 3.11 API', q: 'Was ist ein SQL-Dump (.sql)?',
+    {d: 2, t: '3.8 Visualisieren, 3.10 JSON, 3.11 API', q: 'Was ist ein SQL-Dump (.sql)?',
       a: ['eine Textdatei mit SQL-Befehlen zum Wiederherstellen der Tabellen', 'die binäre SQLite-Datenbankdatei mit allen Tabellen darin', 'eine CSV-Datei mit Semikolon als Trennzeichen je Tabelle', 'ein Diagramm der Tabellenstruktur mit den Fremdschlüsseln'],
       e: 'Eine SQLite-Datenbank ist eine einzige Datei (z. B. kurs.db); der Dump ist nur Text für den Austausch.', src: 'OPAL LB9 1.7'},
 
@@ -240,10 +297,10 @@
     {d: 2, t: '3.13/3.14 Vertiefung, Daten in der Gesellschaft', q: 'In Monaten mit hohem Eisverkauf gibt es mehr Sonnenbrände. Was lässt sich folgern?',
       a: ['Korrelation ja, Kausalität nicht belegt – gemeinsame Ursache: Sonne.', 'Eis essen verursacht Sonnenbrand, weil beides gemeinsam zunimmt.', 'Sonnenbrand verursacht Lust auf Eis, weil beides gemeinsam auftritt.', 'Die Daten sind falsch, weil Eis und Sonnenbrand nicht zusammenhängen dürfen.'],
       e: 'Korrelation: zwei Größen ändern sich gemeinsam. Kausalität: eine verursacht nachweislich die andere.', src: 'OPAL LB9 3.14'},
-    {d: 1, t: '3.13/3.14 Vertiefung, Daten in der Gesellschaft', q: 'Welches der „5 V“ von Big Data beschreibt Unsicherheit und Ungenauigkeit in den Daten?',
+    {d: 2, t: '3.13/3.14 Vertiefung, Daten in der Gesellschaft', q: 'Welches der „5 V“ von Big Data beschreibt Unsicherheit und Ungenauigkeit in den Daten?',
       a: ['Veracity', 'Velocity', 'Volume', 'Variety'],
       e: 'Volume = Menge, Velocity = Geschwindigkeit, Variety = Vielfalt, Veracity = Wahrhaftigkeit, Value = Wert.', src: 'OPAL LB9 3.14'},
-    {d: 1, t: '3.13/3.14 Vertiefung, Daten in der Gesellschaft', q: 'Warum findet ein Python-Dictionary bzw. ein Datenbank-Index einen Eintrag fast unabhängig von der Datenmenge schnell?',
+    {d: 2, t: '3.13/3.14 Vertiefung, Daten in der Gesellschaft', q: 'Warum findet ein Python-Dictionary bzw. ein Datenbank-Index einen Eintrag fast unabhängig von der Datenmenge schnell?',
       a: ['Eine Hashfunktion berechnet aus dem Schlüssel den Speicherplatz.', 'Alle Einträge werden bei jeder Suche vorher neu sortiert.', 'Es durchsucht die Daten einmal von vorn nach hinten.', 'Es speichert nur die jeweils zuletzt hinzugekommenen Werte.'],
       e: 'Statt alle Datensätze zu durchsuchen, greift man direkt zu – auch wenn ständig Daten hinzukommen.', src: 'OPAL LB9 3.13'},
     {d: 1, t: '3.13/3.14 Vertiefung, Daten in der Gesellschaft', q: 'Für eine Klassenumfrage werden Namen durch Nummern ersetzt; die Zuordnungsliste bewahrt die Lehrkraft getrennt auf. Wie nennt man das?',

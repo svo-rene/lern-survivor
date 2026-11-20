@@ -148,8 +148,8 @@ const R3 = (() => {
     aura.visible = false; scene.add(aura);
     bolts = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color: '#e0f2fe'}));
     bolts.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(600 * 3), 3)); bolts.frustumCulled = false; scene.add(bolts);
-    // Lernstationen: Steinpult mit leuchtendem Buch und Lichtsäule (höchstens 4)
-    for (let i = 0; i < 4; i++) {
+    // Lernstationen: Steinpult mit leuchtendem Buch und Lichtsäule (höchstens 10)
+    for (let i = 0; i < 10; i++) {
       const g = new THREE.Group(), add = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; g.add(m); return m; };
       add(new THREE.CylinderGeometry(22, 28, 10, 8), lam('#94a3b8'), 5);
       add(new THREE.CylinderGeometry(9, 12, 30, 8), lam('#cbd5e1'), 25);

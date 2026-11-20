@@ -584,7 +584,7 @@ function bossDown(e){
   G.chests.push({x:e.x, y:e.y, free:true}); G.nextWorldT=3; toast(`🏁 ${WORLDS[G.world].name} geschafft! Gratis-Kiste – gleich geht es weiter.`);
 }
 // Arena: feste Kisten und Lernstationen je Welt (Startplatz frei, nie im Baum)
-const ARENA=R3.ARENA, CHESTS=[10,14,18], STATIONS_PER_WORLD=3;
+const ARENA=R3.ARENA, CHESTS=[10,14,18], STATIONS=[7,8,9];
 const inArena = (o, m=30) => { o.x=Math.max(-ARENA+m,Math.min(ARENA-m,o.x)); o.y=Math.max(-ARENA+m,Math.min(ARENA-m,o.y)); };
 function freeSpot(minR, others, gap){
   for(let k=0;k<200;k++){ const x=(Math.random()*2-1)*(ARENA-120), y=(Math.random()*2-1)*(ARENA-120);
@@ -594,7 +594,7 @@ function freeSpot(minR, others, gap){
 function setupWorld(){
   const all=[]; G.chests=G.chests.filter(c=>c.free); G.stations=[];
   for(let i=0;i<CHESTS[G.world];i++){ const c=freeSpot(300, all, G.world>1?320:380); G.chests.push(c); all.push(c); }
-  for(let i=0;i<STATIONS_PER_WORLD;i++){ const s=freeSpot(500, all, 500); G.stations.push(s); all.push(s); }
+  for(let i=0;i<STATIONS[G.world];i++){ const s=freeSpot(450, all, 400); G.stations.push(s); all.push(s); }
 }
 // Weltwechsel: Gegner verschwinden, Kristalle fliegen zu dir, halbes Leben zurück
 function nextWorld(){
@@ -602,7 +602,7 @@ function nextWorld(){
   for(const e of G.en) G.fx.push({x:e.x,y:e.y,r:e.r*2,life:.3,max:.3,col:'#fff'});
   G.en=[]; G.eshots=[]; G.loot=[]; G.eliteT=35; G.gems.forEach(g=>g.pull=true);
   p.hp=Math.min(p.maxHp, p.hp+p.maxHp*.5); p.inv=2; G.banish++;
-  R3.setWorld(G.world); setupWorld(); SND.music(G.world); const w=WORLDS[G.world]; toast(`${w.icon} Welt ${G.world+1}: ${w.name} – ${CHESTS[G.world]} Kisten, ${STATIONS_PER_WORLD} Lernstationen`);
+  R3.setWorld(G.world); setupWorld(); SND.music(G.world); const w=WORLDS[G.world]; toast(`${w.icon} Welt ${G.world+1}: ${w.name} – ${CHESTS[G.world]} Kisten, ${STATIONS[G.world]} Lernstationen`);
 }
 // Anfang sanft (linearer Teil), danach steigt es schnell (Potenz-Teil)
 // Welt 1 + Anfang Welt 2: ruhig lernen; danach steigt es steil (Potenz pw), Ende Welt 2 ist richtig schwer
@@ -711,7 +711,7 @@ function update(dt){
   for(const b of G.bolts) b.life-=dt; G.bolts=G.bolts.filter(b=>b.life>0);
   for(const s of G.slashes) s.life-=dt; G.slashes=G.slashes.filter(s=>s.life>0);
 
-  if(G.pending>0 && mode==='play' && G.luT<=0 && !(G.quizCD>0)) openQuiz();
+  if(G.pending>0 && mode==='play' && G.luT<=0 && !(G.quizCD>0)){ G.lastLuck=luckNow(); G.lastOk=true; G.lastReroll=false; joy=null; SND.play('pick'); openPick(); }   // Level-up ohne Frage: Fragen gibt es an Kisten und Lernstationen
 }
 // Kisten: feste Anzahl je Welt (setupWorld); anlaufen + genug Gold = öffnen (erst Frage, dann Gegenstand)
 function updChests(dt){
@@ -722,7 +722,7 @@ function updChests(dt){
     if(c.free || G.gold>=cost){ if(!c.free){ G.gold-=cost; G.opened++; } G.chests.splice(G.chests.indexOf(c),1); G.chestMode=true; SND.play('chest'); openQuiz(); return; }
     if(G.goldMsgT<=0){ toast(`📦 Kiste kostet ${cost} 🪙 – du hast ${G.gold}`); G.goldMsgT=2.5; } }
 }
-// Lernstation: anlaufen = schwere Frage; richtig = epische oder legendäre Belohnung, falsch = nichts
+// Lernstation: anlaufen = Frage der höchsten Stufe dieser Welt; richtig = epische oder legendäre Belohnung, falsch = nichts
 function updStations(){
   const p=G.p;
   for(const st of G.stations){ const d=Math.hypot(st.x-p.x, st.y-p.y); if(d<450) tip('station');
@@ -824,21 +824,29 @@ function hud(){
 function luckNow(){ return G.p.luck + 4 + Math.min(16, G.streak*2); }
 // Abstand zwischen zwei Level-up-Fragen: wächst mit dem Level (Level 5: 5 s, Level 15: 8 s, ab Level 26: 12 s)
 const luGap = () => Math.min(12, 3 + G.level*.35) + 8*late();
+// Schwierigkeit steigt nur mit der Welt: Welt 1 nur Grundlagen (AFB I), danach kommen sie weiter am häufigsten
+const DMIX = [[1,0,0], [.7,.3,0], [.5,.32,.18]];
+function rollD(){ const m=DMIX[Math.min(2,G.world)]; let r=Math.random(); for(let d=0;d<3;d++){ if((r-=m[d])<0) return d+1; } return 1; }
 function pickQuestion(){
-  const F=choice.area.fragen;
-  if(G.stationMode){ const L=focusActive()&&choice.fmode==='nur'?F.filter(inFocus):F;
-    for(const d of [3,2,1]){ const pool=L.filter(f=>f.d===d&&!G.asked.has(f)); if(pool.length){ const f=pool[Math.floor(Math.random()*pool.length)]; G.asked.add(f); return {f, again:false}; } } }
+  const F=choice.area.fragen, A=areaProg(choice.area.id), cap=Math.min(3,G.world+1);
+  const take=f=>{ G.asked.add(f); G.lastQ=[f,...(G.lastQ||[])].slice(0,8); return f; };
+  if(G.stationMode){ const L=focusActive()&&choice.fmode==='nur'?F.filter(inFocus):F;   // Lernstation: schwerste Stufe dieser Welt
+    for(let d=cap; d>=1; d--){ const pool=L.filter(f=>f.d===d&&!G.asked.has(f)); if(pool.length) return {f:take(pool[Math.floor(Math.random()*pool.length)]), again:false}; } }
   const due=G.review.findIndex(r=>r.due<=G.level);
   if(due>=0){ const r=G.review.splice(due,1)[0]; return {f:r.f, again:true}; }
   if(G.due && G.due.length){ const f=G.due.shift(); G.asked.add(f); return {f, again:true}; }
   // Schwerpunkt: nur Fragen der gewählten Themen, oder überwiegend (4 von 5)
   let L=F;
   if(focusActive()){ const inn=F.filter(inFocus), out=F.filter(f=>!inFocus(f)); L = choice.fmode==='nur' || !out.length ? inn : (Math.random()<.8 && inn.length ? inn : out); }
-  let pool=L.filter(f=>f.d===G.diff && !G.asked.has(f));
-  if(!pool.length) pool=L.filter(f=>!G.asked.has(f));   // lieber eine ungestellte Frage anderer Stufe als eine Wiederholung
-  if(!pool.length){ L.forEach(f=>G.asked.delete(f)); pool=L.filter(f=>f.d===G.diff); }
-  if(!pool.length) pool=L;
-  const f=pool[Math.floor(Math.random()*pool.length)]; G.asked.add(f); return {f, again:false};
+  // Stufe würfeln, nie über der Welt; fehlt die Stufe, eine leichtere
+  for(let d=rollD(); d>=1; d--){
+    const lv=L.filter(f=>f.d===d); if(!lv.length) continue;
+    let pool=lv.filter(f=>!G.asked.has(f));
+    if(!pool.length){ lv.forEach(f=>G.asked.delete(f)); pool=lv.filter(f=>!(G.lastQ||[]).includes(f)); if(!pool.length) pool=lv; }   // alle gestellt: von vorn (Grundlagen immer wieder)
+    const neu=pool.filter(f=>!A.seen[qKey(f)]); if(neu.length && Math.random()<.7) pool=neu;   // noch nie richtig beantwortet: bevorzugt
+    return {f:take(pool[Math.floor(Math.random()*pool.length)]), again:false};
+  }
+  const lv=L.filter(f=>f.d<=cap), pool=lv.length?lv:L; return {f:take(pool[Math.floor(Math.random()*pool.length)]), again:false};
 }
 const esc = s => s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 // Formelsatz (nur außerhalb von Code): $F_G = m · g$ → Buchstaben kursiv, _G bzw. _{12} tiefgestellt; {{a|b}} → Bruch
@@ -885,7 +893,7 @@ function openQuiz(){
   const code=f.q.includes('\n'), readMs=Math.min(8000, Math.max(1500, f.q.length*28 + (code?2500:0)));
   Q={f, again, opts, reroll:!!G.rerollQ, t0:Infinity, read0:performance.now(), readMs, bonus:Math.max(8, 14 - G.t/60)*1000, done:false, shown:false};
   G.rerollQ=false;
-  $('qinfo').textContent=(G.stationMode?'🏛️ Lernstation · schwere Frage · ':G.chestMode?'📦 Kiste · ':'')+(again?'🔁 Wiederholung · ':'')+'Stufe '+'★'.repeat(f.d)+'☆'.repeat(3-f.d);
+  $('qinfo').textContent=(G.stationMode?'🏛️ Lernstation · ':G.chestMode?'📦 Kiste · ':'')+(again?'🔁 Wiederholung · ':'')+'Stufe '+'★'.repeat(f.d)+'☆'.repeat(3-f.d);
   $('qluck').textContent=(G.streak?'🔥 Streak '+G.streak+' · ':'')+'⚡ schnell = mehr Glück';
   $('qtext').innerHTML=fmt(f.q)+qMedia(f);
   $('qans').classList.toggle('grid', opts.some(o=>typeof o.t==='object'));
@@ -893,7 +901,7 @@ function openQuiz(){
   $('qans').classList.add('wait'); $('qRead').style.display='block'; $('bonus').classList.add('read');
   $('box_q').classList.remove('win','lose');
   $('fb').style.display='none'; $('qNext').style.display='none';
-  modalHint('qHint','quiz','⬆️ <b>Level-up!</b> Beantworte die Frage, danach wählst du eine Karte. <b>Richtig + schnell</b> (solange der gelbe Balken läuft) = mehr 🍀 Glück auf seltene Karten. Falsch = trotzdem eine Karte, aber ohne Glück.');
+  modalHint('qHint','quiz','❓ <b>Frage!</b> Danach bekommst du deine Belohnung. <b>Richtig + schnell</b> (solange der gelbe Balken läuft) = mehr 🍀 Glück auf seltene Karten und dein 🔥 Streak wächst.');
   show('ovQuiz');
 }
 function showAnswers(){ if(!Q||Q.shown) return; Q.shown=true; Q.t0=performance.now(); $('qans').classList.remove('wait'); $('qRead').style.display='none'; $('bonus').classList.remove('read'); }
@@ -910,9 +918,6 @@ $('qans').addEventListener('click', e=>{
   if(o.ok && G.stationMode){ prog.stations=(prog.stations||0)+1; saveProg(); checkUnlocks(); }
   if(o.ok){ G.streak++; if(G.streak===2) tip('streak'); G.best=Math.max(G.best,G.streak); G.lastLuck=luckNow()+(fast?3:0); }
   else { b.classList.add('bad'); G.streak=0; G.lastLuck=-1; G.review.push({f:Q.f, due:G.level+3}); if(!G.wrongs.includes(Q.f)) G.wrongs.push(Q.f); }
-  const r3=G.recent.slice(-3);
-  if(r3.length===3 && r3.every(Boolean) && G.diff<3){ G.diff++; G.recent=[]; }
-  else if(r3.length>=3 && r3.filter(x=>!x).length>=2 && G.diff>1){ G.diff--; G.recent=[]; }
   $('fb').innerHTML=(o.ok?`<b style="color:var(--ok)">✔ Richtig!</b>${fast?' ⚡ schnell!':''} 🍀 Glück ${G.lastLuck}`:`<b style="color:var(--bad)">✘ Leider falsch.</b> Streak weg – die Frage kommt später wieder.`)+'<br>'+fmt(Q.f.e);
   $('fb').style.display='block'; const nb=$('qNext'); nb.style.display='block'; nb.disabled=!o.ok;
   if(!o.ok) setTimeout(()=>nb.disabled=false, 1500);
@@ -995,7 +1000,7 @@ function resume(){ show(null); const was=mode; mode='play'; last=performance.now
   if(G && (was==='quiz'||was==='pick')){ const p=G.p; p.inv=Math.max(p.inv||0, 1.2); for(const e of G.en) if((e.x-p.x)**2+(e.y-p.y)**2<140*140) knock(e,p,90);
     G.fx.push({x:p.x,y:p.y,r:140,life:.35,max:.35,col:'#7dd3fc'}); } }
 function pause(){ mode='pause'; const a=G.hist.filter(Boolean).length;
-  $('pauseInfo').innerHTML=`<p>Fragen: ${a} von ${G.hist.length} richtig · bester Streak ${G.best} · Schwierigkeit ${'★'.repeat(G.diff)}</p>`; show('ovPause'); }
+  $('pauseInfo').innerHTML=`<p>Fragen: ${a} von ${G.hist.length} richtig · bester Streak ${G.best} · Schwierigkeit ${'★'.repeat(Math.min(3,G.world+1))}</p>`; show('ovPause'); }
 const FOE_NAME = t => t==='shot' ? 'eine Kugel' : (FOES[t]||{}).name || 'ein Gegner';
 function gameOver(win){
   mode='over'; document.body.classList.remove('playing'); SND.music(-1); SND.play(win?'win':'over');
@@ -1012,7 +1017,7 @@ function gameOver(win){
     (win?'':`<br>Erwischt hat dich: ${FOE_NAME(G.lastHit)}, bei ${fmtT(s)}.`+` Erreicht: ${WORLDS[G.world].icon} Welt ${G.world+1} von 3.`)+
     (G.newPages?`<br>📓 ${G.newPages} neue Hefterseite${G.newPages>1?'n':''} freigeschaltet!`:'');
   $('overBoard').innerHTML=boardHtml(entry.area, entry.id); renderBoard();
-  $('overStats').innerHTML=`<div>⏱ ${fmtT(s)}</div><div>${WORLDS[G.world].icon} Welt ${G.world+1}/3</div><div>⬆️ Level ${G.level}</div><div>💥 ${G.kills} besiegt</div><div>✔ ${ok}/${G.hist.length} richtig</div><div>🔥 bester Streak ${G.best}</div><div>★ erreicht ${'★'.repeat(G.diff)}</div>`;
+  $('overStats').innerHTML=`<div>⏱ ${fmtT(s)}</div><div>${WORLDS[G.world].icon} Welt ${G.world+1}/3</div><div>⬆️ Level ${G.level}</div><div>💥 ${G.kills} besiegt</div><div>✔ ${ok}/${G.hist.length} richtig</div><div>🔥 bester Streak ${G.best}</div><div>★ erreicht ${'★'.repeat(Math.min(3,G.world+1))}</div>`;
   const D=Object.entries(G.dmgBy).filter(([k])=>WEAPONS[k]||k==='dornen').sort((x,y)=>y[1]-x[1]), mx=D.length?D[0][1]:1;
   $('overDmg').innerHTML=D.map(([k,v])=>{ const W_=(G.p.w[k]&&wInfo(k,G.p.w[k]))||WEAPONS[k]||{icon:'🌵',name:'Dornenmantel'}; return `<div class="dmgrow"><b>${W_.icon} ${W_.name}</b><i style="width:${Math.max(3,v/mx*100)}%"></i><span>${Math.round(v).toLocaleString('de-DE')}</span></div>`; }).join('')||'<p class="hint">–</p>';
   $('overWrong').innerHTML=G.wrongs.length?G.wrongs.map(f=>`<div class="wrong"><b>${fmt(f.q)}</b>${qMedia(f)}✔ ${ansHtml(f.a[0])}<br><span style="color:var(--mut)">${fmt(f.e)}</span></div>`).join(''):'<p>Nichts – alles richtig! 🎉</p>';
@@ -1112,13 +1117,13 @@ function helpHtml(){
   const U=[...CLASSES.filter(c=>UNLOCK[c.id]).map(c=>`<li>${c.icon} <b>${c.name}</b> – frei ${UNLOCK[c.id].txt} (${clsOpen(c)?'✅ frei':UNLOCK[c.id].st()})</li>`),
            ...Object.entries(WUNLOCK).filter(([id])=>!CLASSES.some(c=>c.weapon===id&&UNLOCK[c.id])).map(([id,u])=>`<li>${WEAPONS[id].icon} <b>${WEAPONS[id].name}</b> – frei ${u.txt} (${wOpen(id)?'✅ frei':u.st?u.st():'gesperrt'})</li>`)].join('');
   return `<h3>🎯 Ziel</h3><p>Überlebe die drei Welten und besiege am Ende jeder Welt den Boss. Deine Figur <b>greift von allein an</b> – du läufst nur und weichst aus (💨 Leertaste oder Knopf).</p>
-  <h3>⬆️ Level-up und Fragen</h3><p>Besiegte Gegner lassen 💎 Kristalle fallen. Leiste voll = Level-up: Erst kommt eine <b>Frage</b>, dann wählst du eine von 3 Karten. <b>Richtig und schnell</b> antworten bringt 🍀 Glück: seltene Karten (<span style="color:var(--r1)">selten</span>, <span style="color:var(--r2)">episch</span>, <span style="color:var(--r3)">legendär</span>) bringen mehrere Stufen auf einmal. Falsch gibt es trotzdem eine Karte, aber fast nur gewöhnliche.</p>
+  <h3>⬆️ Level-up und Fragen</h3><p>Besiegte Gegner lassen 💎 Kristalle fallen. Leiste voll = Level-up: Du wählst sofort eine von 3 Karten. <b>Fragen</b> gibt es an 📦 Kisten und 🏛️ Lernstationen – such sie aktiv, dort warten die besten Belohnungen. <b>Richtig und schnell</b> antworten bringt 🍀 Glück: seltene Karten (<span style="color:var(--r1)">selten</span>, <span style="color:var(--r2)">episch</span>, <span style="color:var(--r3)">legendär</span>) bringen mehrere Stufen auf einmal. Falsch gibt es trotzdem eine Karte, aber fast nur gewöhnliche. In Welt 1 kommen nur Grundlagenfragen, ab Welt 2 auch schwerere – die Grundlagen bleiben aber am häufigsten. Falsche Antworten kommen wieder.</p>
   <h3>🎒 Plätze: je 4</h3><p>Du hast <b>4 Waffenplätze</b> (die Startwaffe belegt schon einen), <b>4 Buchplätze</b> und <b>4 Plätze für Gegenstände</b>. Wähle weise: Ist ein Bereich voll, kannst du dort nur noch verbessern. Mit 🚫 verbannst du eine Karte, die du nie willst.</p>
   <h3>⚔️ Waffen (bis Stufe ${MAX_WEP_LVL})</h3><div class="tbl">${W_}</div>
   <h3>📚 Bücher</h3><div class="tbl">${B}</div>
   <h3>⭐ Superwaffen</h3><p>Waffe auf Stufe ${MAX_WEP_LVL}, passendes Buch voll und <b>${EVO_STREAK} richtige Antworten in Folge</b> → beim nächsten Level-up kommt die Superwaffe als goldene Karte.</p><div class="tbl">${E}</div>
   <h3>📦 Kisten und Gegenstände</h3><p>In den Welten liegen ${CHESTS.join(', ')} Kisten – später gibt es weniger Level-ups, dafür mehr Kisten. Mit genug 🪙 Gold läufst du hinein: Frage, dann ein Gegenstand. Jede Kiste wird teurer.</p><div class="tbl">${I}</div>
-  <h3>🏛️ Lernstationen</h3><p>${STATIONS_PER_WORLD} pro Welt (blau auf der Karte). Eine <b>schwere Frage</b>: richtig = 3 Karten, alle mindestens episch. Falsch = nichts. Jede Station gibt es nur einmal.</p>
+  <h3>🏛️ Lernstationen</h3><p>${STATIONS.join(', ')} pro Welt (blau auf der Karte). Eine Frage der höchsten Stufe dieser Welt (Welt 1 leicht, Welt 2 mittel, Welt 3 schwer): richtig = 3 Karten, alle mindestens episch. Falsch = nichts. Jede Station gibt es nur einmal.</p>
   <h3>👑 Elite-Gegner und Fundstücke</h3><p>Etwa jede Minute kommt ein großer, goldener Gegner. Besiegt lässt er eine <b>Gratis-Kiste</b> und ein Fundstück fallen: 🧲 Magnet (alle Kristalle), 💣 Bombe (alle Gegner um dich), 🧪 Trank (halbes Leben).</p>
   <h3>🔓 Freischalten</h3><ul>${U}</ul>
   <h3>📓 Hefter</h3><p>Richtige Antworten schalten Seiten in deinem Hefter frei – zum Nachlesen und Lernen.</p>`;
@@ -1151,7 +1156,7 @@ const TIPS = {
   streak:'🔥 <b>Streak!</b> Mehrere richtige Antworten hintereinander geben immer mehr 🍀 Glück auf seltene Karten.',
   boss:  '⚠️ Ein <b>Boss</b> kommt! Achte auf die <b>rote Linie</b> – dort stürmt er gleich hin – und weiche den Kugelringen aus. Besiegst du ihn, kommst du in die <b>nächste Welt</b> – dazu gibt es eine <b>Gratis-Kiste</b> und einen Heilkristall.',
   abi:   '',   // setzt applyBosses()
-  station:'🏛️ Eine <b>Lernstation</b>! Lauf hin: Es kommt eine <b>schwere Frage</b>. Richtig = <b>epische oder legendäre</b> Belohnung, falsch = nichts. Jede Station gibt es nur einmal.',
+  station:'🏛️ Eine <b>Lernstation</b>! Lauf hin: Es kommt eine Frage (je Welt etwas schwerer). Richtig = <b>epische oder legendäre</b> Belohnung, falsch = nichts. Jede Station gibt es nur einmal.',
   elite:'👑 Ein <b>Elite-Gegner</b>: groß, golden und zäh. Besiegst du ihn, lässt er eine <b>Gratis-Kiste</b> und ein Fundstück fallen.',
   evo:'⭐ Eine Waffe ist auf <b>Stufe 8</b>! Ist auch ihr <b>passendes Buch voll</b> und hast du <b>5 richtige Antworten in Folge</b>, kommt sie als <b>Superwaffe</b> (goldene Karte). Welches Buch passt, steht unter „📖 So geht’s“.',
   loot:'✨ Ein <b>Fundstück</b> liegt in der Nähe: 🧲 Magnet holt alle Kristalle, 💣 Bombe trifft alle Gegner um dich, 🧪 Trank heilt dich. Einfach hinlaufen!',
